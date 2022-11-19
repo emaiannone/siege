@@ -1,206 +1,186 @@
 package it.unisa.siege;
 
-import com.opencsv.CSVReader;
-import com.opencsv.CSVReaderBuilder;
+import com.opencsv.exceptions.CsvValidationException;
 import org.apache.commons.cli.*;
-import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.maven.shared.invoker.DefaultInvocationRequest;
+import org.apache.maven.shared.invoker.DefaultInvoker;
+import org.apache.maven.shared.invoker.InvocationRequest;
+import org.apache.maven.shared.invoker.MavenInvocationException;
 import org.evosuite.EvoSuite;
 import org.evosuite.Properties;
 import org.evosuite.coverage.vulnerability.VulnerabilityDescription;
-import org.evosuite.ga.metaheuristics.GeneticAlgorithm;
-import org.evosuite.result.TestGenerationResult;
-import org.evosuite.testcase.TestCase;
-import org.evosuite.testcase.TestChromosome;
 import org.evosuite.utils.LoggingUtils;
 import org.slf4j.Logger;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class Siege {
-    public static final String CLASS = "class";
-    public static final String TARGET = "target";
-    public static final String LIBRARIES = "librariesPath";
-    public static final String VULNERABILITIES = "vulnerabilities";
-    public static final String VULN_CLASS = "vulnClass";
-    public static final String VULN_METHOD = "vulnMethod";
-    public static final String VULN_LINE = "vulnLine";
-    public static final String BUDGET = "budget";
-    public static final String EXPORT = "export";
-    public static final String DEFAULT_TARGET = "target/classes";
-    public static final String DEFAULT_LIBRARIES = "target/lib";
-    public static final String EXPORTS_DIR = "siege_exports/";
-    public static final String STATUS_UNREACHABLE = "UNREACHABLE";
-    public static final String STATUS_REACHABLE = "REACHABLE";
-    public static final List<String> headers = Arrays.asList(
-            "cve",
-            "status",
-            "clientClass",
-            "budget",
-            "bestFitness",
-            "iterations"
-    );
     private static final Logger logger = LoggingUtils.getEvoLogger();
 
-    public static void main(String[] args) throws IOException {
+    public static final String CLIENT_CLASS_OPT = "clientClass";
+    public static final String VULNERABILITIES_OPT = "vulnerabilities";
+    public static final String BUDGET_OPT = "budget";
+    public static final String POPULATION_SIZE_OPT = "populationSize";
+    public static final String EXPORT_OPT = "export";
+
+    public static final String EXPORTS_DIR = "siege_report/";
+
+    public static void main(String[] args) throws Exception {
         Options options = new Options();
-        options.addOption(new Option(CLASS, true, "Client class where an exploit will start from. A fully qualifying needs to be provided, e.g. org.foo.SomeClass"));
-        options.addOption(new Option(TARGET, true, "Client project classpath. A directory containing all compiled Java classes needs to be provided, e.g. target/classes"));
-        options.addOption(new Option(LIBRARIES, true, "Libraries root directory. A directory all the JARs required by client project needs to be provided, e.g. target/lib"));
-        options.addOption(new Option(VULNERABILITIES, true, "CSV File containing descriptions of a set of known vulnerabilities. A CSV file needs to be provided."));
-        options.addOption(new Option(VULN_CLASS, true, "Vulnerable class to be targeted by an exploit. A fully qualifying needs to be provided, e.g. org.foo.SomeClass"));
-        options.addOption(new Option(VULN_METHOD, true, "Vulnerable method to be targeted by an exploit. A name and descriptor needs to be provided, e.g. someMethod([B[B)Z"));
-        options.addOption(new Option(VULN_LINE, true, "Vulnerable line to be targeted by an exploit. A non negative number needs to be provided, e.g. 12."));
-        options.addOption(new Option(BUDGET, true, "Allotted search budget. A non negative number needs to be provided, e.g. 50."));
-        options.addOption(new Option(EXPORT, false, "Generate a .csv export of the results in the CWD."));
+        options.addOption(new Option(CLIENT_CLASS_OPT, true, "Client class fully-qualified name (e.g. org.foo.SomeClass) from which the exploit generation will start. If not specified, the Maven-specified output directory will be used and all client classes inside considered."));
+        options.addOption(new Option(VULNERABILITIES_OPT, true, "Path to a CSV file containing the descriptions of the list of known vulnerabilities to reach."));
+        options.addOption(new Option(BUDGET_OPT, true, "A non-negative number indicating the time budget expressed in seconds."));
+        options.addOption(new Option(POPULATION_SIZE_OPT, true, "A positive number indicating the number of test cases in each generation."));
+        options.addOption(new Option(EXPORT_OPT, false, "Flag to require the output to be written on a CSV file instead of stdout."));
 
-        String clientClass = null;
-        String target = null;
-        String libraries = null;
-        String vulnerabilities = null;
-        String vulnClass = null;
-        String vulnMethod = null;
-        String vulnLine = null;
-        String budget = null;
-        boolean export = false;
         CommandLineParser parser = new DefaultParser();
+        CommandLine line = null;
         try {
-            CommandLine line = parser.parse(options, args);
-            clientClass = line.getOptionValue(CLASS);
-            target = line.hasOption(TARGET) ? line.getOptionValue(TARGET) : DEFAULT_TARGET;
-            libraries = line.hasOption(LIBRARIES) ? line.getOptionValue(LIBRARIES) : DEFAULT_LIBRARIES;
-            vulnerabilities = line.getOptionValue(VULNERABILITIES);
-            vulnClass = line.getOptionValue(VULN_CLASS);
-            vulnMethod = line.getOptionValue(VULN_METHOD);
-            vulnLine = line.getOptionValue(VULN_LINE);
-            budget = line.getOptionValue(BUDGET);
-            export = line.hasOption(EXPORT);
+            line = parser.parse(options, args);
         } catch (ParseException e) {
-            logger.error("Invalid options. Exiting.");
-            System.exit(1);
+            throw new RuntimeException("Invalid options given. Exiting.", e);
         }
+        String clientClass = line.getOptionValue(CLIENT_CLASS_OPT);
+        //String clientProjectRoot = line.getOptionValue(CLIENT_PROJECT_ROOT);
+        //String targetClasses = line.hasOption(TARGET_CLASSES) ? line.getOptionValue(TARGET_CLASSES) : DEFAULT_TARGET_CLASSES;
+        //String targetLibraries = line.hasOption(TARGET_LIBRARIES) ? line.getOptionValue(TARGET_LIBRARIES) : DEFAULT_TARGET_LIBRARIES;
+        String vulnerabilities = line.getOptionValue(VULNERABILITIES_OPT);
 
-        // Get target vulnerability(ies)
+        // Get the target vulnerability(ies)
         List<Pair<String, VulnerabilityDescription>> vulnerabilityList = new ArrayList<>();
-        if (vulnerabilities != null) {
-            try {
-                vulnerabilityList.addAll(readAndParseCsv(vulnerabilities));
-            } catch (IOException e) {
-                logger.error("Vulnerabilities file not found. Exiting.");
-                System.exit(1);
-            }
-        } else {
-            if (vulnClass == null && vulnMethod == null && vulnLine == null) {
-                logger.error("Either vulnerabilities or vulnClass, vulnMethod and vulnLine needs to be specified.");
-                System.exit(1);
-            }
-            if (vulnClass == null || vulnMethod == null || vulnLine == null) {
-                logger.error("All vulnClass, vulnMethod and vulnLine needs to be specified togeher.");
-                System.exit(1);
-            }
-            vulnerabilityList.add(new ImmutablePair<>(vulnClass, new VulnerabilityDescription(vulnClass, vulnMethod, Integer.parseInt(vulnLine))));
+        try {
+            vulnerabilityList.addAll(SiegeIO.readAndParseCsv(vulnerabilities));
+        } catch (FileNotFoundException e) {
+            throw new IOException("Cannot find the CSV containing the vulnerabilities. Exiting.", e);
+        } catch (CsvValidationException e) {
+            throw new IOException("Cannot parse the CSV containing the vulnerabilities. Exiting.", e);
         }
 
-        // TODO Bound population?
-        // TODO Is there a way not to stop the generation when all the TC have the same fitness? Which MH is the best?
-        List<String> baseCommands = new ArrayList<>(Arrays.asList(
+        // TODO Which Meta-Heuristic would fit better?
+        List<String> evosuiteCommands = new ArrayList<>(Arrays.asList(
                 "-generateTests",
                 "-criterion", Properties.Criterion.VULNERABILITY.name(),
-                "-Dstrategy=" + Properties.Strategy.ONEBRANCH.name(),
+                "-Dalgorithm=" + Properties.Algorithm.STEADY_STATE_GA.name(),
+                "-Dinstrument_parent=false", // If this is true it seems to give problem to RMI
                 "-Dinstrument_context=true",
                 "-Dinstrument_method_calls=true",
                 "-Dinstrument_libraries=true",
                 "-Dassertions=false",
                 "-Dminimize=true",
-                "-Dpopulation=" + 100,
-                "-Djunit_suffix=SiegeTest"
+                "-Dserialize_ga=true",
+                "-Dserialize_result=true",
+                "-Dcoverage=false",
+                "-Dprint_covered_goals=true",
+                "-Dprint_missed_goals=true",
+                //"-Dshow_progress=false",
+                "-Dtest_dir=siege_tests"
         ));
-        if (clientClass != null) {
-            baseCommands.add("-class");
-            baseCommands.add(clientClass);
-        } else {
-            baseCommands.add("-target");
-            baseCommands.add(target);
-        }
-        baseCommands.add("-projectCP");
-        baseCommands.add(buildProjectClasspath(target, libraries));
+
         // Default budget is 60 (set by EvoSuite if -Dsearch_budget is not specified)
+        String budget = line.getOptionValue(BUDGET_OPT);
         if (budget != null) {
-            baseCommands.add("-Dsearch_budget=" + budget);
-        }
-        String project = System.getProperty("user.dir");
-        String canonicalProjectPath = (new File(project)).getCanonicalPath();
-        generateExploits(canonicalProjectPath, vulnerabilityList, baseCommands, export);
-        System.exit(0);
-    }
-
-    private static void generateExploits(String project, List<Pair<String, VulnerabilityDescription>> vulnerabilityList, List<String> baseCommands, boolean export) {
-        EvoSuite evoSuite = new EvoSuite();
-        List<List<String>> exportResults = new ArrayList<>();
-        logger.info("* Generating Exploits through {}\n", project);
-        for (Pair<String, VulnerabilityDescription> vulnerability : vulnerabilityList) {
-            logger.info("* Target Vulnerability: {}", vulnerability.getLeft());
-            List<String> evoSuiteCommands = new ArrayList<>(baseCommands);
-            evoSuiteCommands.add("-DvulnClass=" + vulnerability.getRight().getVulnerableClass());
-            evoSuiteCommands.add("-DvulnMethod=" + vulnerability.getRight().getVulnerableMethod());
-            evoSuiteCommands.add("-DvulnLine=" + vulnerability.getRight().getVulnerableLine());
-            try {
-                List<List<TestGenerationResult>> fullResults = (List<List<TestGenerationResult>>) evoSuite.parseCommandLine(evoSuiteCommands.toArray(new String[0]));
-                String status;
-                logger.info("\n* Results for {}", vulnerability.getLeft());
-                if (fullResults.size() == 0) {
-                    status = STATUS_UNREACHABLE;
-                    logger.info("* Status: {}", status);
-                    if (export) {
-                        exportResults.add(Arrays.asList(
-                                vulnerability.getLeft(), status, null, String.valueOf(Properties.SEARCH_BUDGET), null, null
-                        ));
-                    }
-                } else {
-                    for (List<TestGenerationResult> testResults : fullResults) {
-                        for (TestGenerationResult clientClassResult : testResults) {
-                            status = String.valueOf(clientClassResult.getTestGenerationStatus());
-                            String clientClass = clientClassResult.getClassUnderTest();
-                            GeneticAlgorithm<?> ga = clientClassResult.getGeneticAlgorithm();
-                            TestChromosome best = (TestChromosome) ga.getBestIndividual();
-                            int gaIterations = ga.getAge() + 1;
-
-                            // Oddly, spent budget cannot be taken easily since EvoSuite does not keep track of the stopping conditions in ga object
-                            if (export) {
-                                exportResults.add(Arrays.asList(
-                                        vulnerability.getLeft(), status, clientClass, String.valueOf(Properties.SEARCH_BUDGET), String.valueOf(best.getFitness()), String.valueOf(gaIterations)
-                                ));
-                            }
-                            logger.info("* Results of client class {}", clientClassResult.getClassUnderTest());
-                            logger.info("* Status: {}", status);
-                            logger.info("* GA terminated within {} seconds. Iteration {}, Population Size {}", Properties.SEARCH_BUDGET, gaIterations, ga.getPopulationSize());
-                            logger.info("* Best Individual ID {} (Iteration {}, Evals {}), scored {}:", best.getTestCase().getID(), best.getAge(), best.getNumberOfEvaluations(), best.getFitness());
-                            logger.info(best.getTestCase().toCode());
-                            TestCase minimizedTC = clientClassResult.getTestCase("test0");
-                            if (minimizedTC != null) {
-                                logger.info("* Best Individual post Minimization:");
-                                logger.info(minimizedTC.toCode());
-                            } else {
-                                logger.info("* Best Individual could not be minimized: not all goals were covered.");
-                            }
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                // Print and go to next iteration
-                logger.error("Error while generating exploits for {}: {}", vulnerability.getLeft(), e);
+            if (Integer.parseInt(budget) < 1) {
+                throw new IllegalArgumentException("Time budget cannot be less than 1 second. Exiting.");
+            } else {
+                evosuiteCommands.add("-Dsearch_budget=" + budget);
             }
-            logger.info("");
         }
-        if (export) {
-            String projectName = project.substring(project.lastIndexOf('/') + 1);
-            writeToCsv(projectName, exportResults);
+        String populationSize = line.getOptionValue(POPULATION_SIZE_OPT);
+        if (populationSize != null) {
+            if (Integer.parseInt(populationSize) < 2) {
+                throw new IllegalArgumentException("Population cannot be made of less than 2 individuals. Exiting.");
+            } else {
+                evosuiteCommands.add("-Dpopulation=" + populationSize);
+            }
+        } else {
+            evosuiteCommands.add("-Dpopulation=" + 100);
+        }
+        boolean exportCsv = line.hasOption(EXPORT_OPT);
+
+        String outputDirectory = getOutputDirectory();
+        if (clientClass != null) {
+            evosuiteCommands.add("-class");
+            evosuiteCommands.add(clientClass);
+        } else {
+            evosuiteCommands.add("-target");
+            evosuiteCommands.add(outputDirectory);
+        }
+        String projectCP = outputDirectory + ":" + getLibraryClasspath();
+        evosuiteCommands.add("-projectCP");
+        evosuiteCommands.add(projectCP);
+
+        // TODO Accept an option for arbitrary project path instead of CWD only
+        String project = System.getProperty("user.dir");
+        String fullProjectPath = (new File(project)).getCanonicalPath();
+        // We have to instantiate EvoSuite to prepare the logging utils, so that the setup is done once for all
+        ExploitGenerator exploitGenerator = new ExploitGenerator(new EvoSuite());
+        logger.info("[SIEGE] Going to generate exploits for {} CVEs through client project {}", vulnerabilityList.size(), fullProjectPath);
+        List<Map<String, String>> results = null;
+        try {
+            results = exploitGenerator.generateExploits(vulnerabilityList, evosuiteCommands);
+        } catch (Exception e) {
+            // Should anything unhandled happen, exit with error
+            e.printStackTrace();
+            System.exit(1);
+        }
+        try {
+            if (results != null && exportCsv) {
+                String projectName = project.substring(project.lastIndexOf('/') + 1);
+                SiegeIO.writeToCsv(EXPORTS_DIR, projectName, results);
+            }
+        } catch (IOException e) {
+            logger.error("Failed to export the results. Printing on stdout instead.", e);
+            logger.info(String.valueOf(results));
+        } finally {
+            System.exit(0);
         }
     }
 
+    private static void callMaven(List<String> goals) throws IOException, MavenInvocationException {
+        if (System.getProperty("maven.home") == null) {
+            Runtime rt = Runtime.getRuntime();
+            String[] commands = {"whereis", "mvn"};
+            Process proc = rt.exec(commands);
+            BufferedReader stdInput = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+            // Read the output from the command
+            String mavenHome = stdInput.readLine().split(" ")[1];
+            System.setProperty("maven.home", mavenHome);
+        }
+        String cwd = System.getProperty("user.dir");
+        File tmpfile = File.createTempFile("tmp", ".txt");
+        InvocationRequest request = new DefaultInvocationRequest();
+        request.setBaseDirectory(new File(cwd));
+        request.setGoals(goals);
+        request.setBatchMode(true);
+        new DefaultInvoker().execute(request);
+    }
+
+    // https://maven.apache.org/plugins/maven-help-plugin/evaluate-mojo.html
+    private static String getOutputDirectory() throws IOException, MavenInvocationException {
+        File tmpfile = File.createTempFile("tmp", ".txt");
+        callMaven(Arrays.asList("help:evaluate", "-Dexpression=project.build.outputDirectory", "-q", "-B", "-Doutput=" + tmpfile.getAbsolutePath()));
+        String outputDir = IOUtils.toString(new FileInputStream(tmpfile), StandardCharsets.UTF_8.name());
+        tmpfile.delete();
+        return outputDir;
+    }
+
+    // http://maven.apache.org/plugins/maven-dependency-plugin/usage.html#dependency:build-classpath
+    private static String getLibraryClasspath() throws IOException, MavenInvocationException {
+        File tmpfile = File.createTempFile("tmp", ".txt");
+        callMaven(Arrays.asList("dependency:build-classpath", "-q", "-B", "-Dmdep.outputFile=" + tmpfile.getAbsolutePath()));
+        String libraryClasspath = IOUtils.toString(new FileInputStream(tmpfile), StandardCharsets.UTF_8.name());
+        tmpfile.delete();
+        return libraryClasspath;
+    }
+
+    /*
     private static String buildProjectClasspath(String target, String librariesPath) {
         StringBuilder jarsPaths = new StringBuilder();
         File jarsDir = new File(librariesPath);
@@ -214,36 +194,5 @@ public class Siege {
         }
         return target + jarsPaths;
     }
-
-    private static List<Pair<String, VulnerabilityDescription>> readAndParseCsv(String file) throws IOException {
-        List<Pair<String, VulnerabilityDescription>> vulnerabilityList = new ArrayList<>();
-        try (CSVReader reader = new CSVReaderBuilder(new FileReader(file)).withSkipLines(1).build()) {
-            String[] values;
-            while ((values = reader.readNext()) != null) {
-                vulnerabilityList.add(new ImmutablePair<>(values[0], new VulnerabilityDescription(values[2], values[3], Integer.parseInt(values[4]))));
-            }
-        }
-        return vulnerabilityList;
-    }
-
-    private static void writeToCsv(String filename, List<List<String>> content) {
-        File exportDir = new File(EXPORTS_DIR);
-        if (!exportDir.exists()) {
-            exportDir.mkdir();
-        }
-        String fullFilename = EXPORTS_DIR + filename + ".csv";
-        File exportFile = new File(fullFilename);
-        // If the file does exists yet, put the headers before
-        if (!exportFile.exists()) {
-            content.add(0, headers);
-        }
-        try (PrintWriter csvWriter = new PrintWriter(new FileOutputStream(exportFile, true))) {
-            for (List<String> line : content) {
-                String csvLine = String.join(",", line);
-                csvWriter.println(csvLine);
-            }
-        } catch (FileNotFoundException e) {
-            logger.error("Cannot write to " + fullFilename + ": quit exporting.");
-        }
-    }
+     */
 }
