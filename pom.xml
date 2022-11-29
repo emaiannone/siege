@@ -6,6 +6,7 @@
 
     <groupId>it.unisa</groupId>
     <artifactId>siege</artifactId>
+    <name>Siege</name>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 

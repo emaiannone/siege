@@ -1,4 +1,4 @@
-package it.unisa.siege;
+package it.unisa.siege.core;
 
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
@@ -8,6 +8,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.evosuite.coverage.vulnerability.VulnerabilityDescription;
 
 import java.io.*;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,11 @@ public class SiegeIO {
         return vulnerabilityList;
     }
 
+    public static void writeToCsv(Path outFilePath, List<Map<String, String>> content) throws IOException {
+        writeToCsv(outFilePath.getParent().toString(), outFilePath.getFileName().toString(), content);
+    }
+
+    // TODO Get rid of this method, rely on the one having Path as parameter only
     public static void writeToCsv(String dir, String filename, List<Map<String, String>> content) throws IOException {
         if (content.isEmpty()) {
             return;
@@ -36,7 +42,7 @@ public class SiegeIO {
         if (!exportDir.exists()) {
             exportDir.mkdir();
         }
-        String fullFilename = Paths.get(dir, filename + ".csv").toString();
+        String fullFilename = Paths.get(dir, filename).toString();
         File exportFile = new File(fullFilename);
         try (PrintWriter csvWriter = new PrintWriter(new FileOutputStream(exportFile, false))) {
             // Put the headers first
