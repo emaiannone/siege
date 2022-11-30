@@ -16,9 +16,9 @@ import java.util.Map;
 import java.util.Set;
 
 public class SiegeIO {
-    public static List<Pair<String, VulnerabilityDescription>> readAndParseCsv(String file) throws CsvValidationException, FileNotFoundException {
+    public static List<Pair<String, VulnerabilityDescription>> readAndParseCsv(Path csvFilePath) throws CsvValidationException, FileNotFoundException {
         List<Pair<String, VulnerabilityDescription>> vulnerabilityList = new ArrayList<>();
-        try (CSVReader reader = new CSVReaderBuilder(new FileReader(file)).withSkipLines(1).build()) {
+        try (CSVReader reader = new CSVReaderBuilder(new FileReader(csvFilePath.toFile())).withSkipLines(1).build()) {
             String[] values;
             while ((values = reader.readNext()) != null) {
                 vulnerabilityList.add(new ImmutablePair<>(values[0], new VulnerabilityDescription(values[2], values[3])));

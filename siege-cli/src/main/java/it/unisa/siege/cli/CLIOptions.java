@@ -4,6 +4,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 
 public class CLIOptions extends Options {
+    // TODO Supply a specific client directory
     public static final String CLIENT_CLASS_OPT = "clientClass";
     public static final String VULNERABILITIES_OPT = "vulnerabilities";
     public static final String BUDGET_OPT = "budget";

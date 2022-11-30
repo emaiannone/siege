@@ -3,8 +3,6 @@ package it.unisa.siege.core;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.maven.shared.invoker.DefaultInvocationRequest;
 import org.apache.maven.shared.invoker.DefaultInvoker;
 import org.apache.maven.shared.invoker.InvocationRequest;
@@ -19,6 +17,9 @@ import org.evosuite.ga.stoppingconditions.StoppingCondition;
 import org.evosuite.result.TestGenerationResult;
 import org.evosuite.testcase.TestCase;
 import org.evosuite.testcase.TestChromosome;
+import org.evosuite.utils.LoggingUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -30,7 +31,7 @@ public class SiegeRunner {
     public static final String STATUS_UNREACHABLE = "UNREACHABLE";
     public static final String STATUS_SUCCESS = "SUCCESS";
     public static final String STATUS_FAILED = "FAILED";
-    private static final Logger LOGGER = LogManager.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(SiegeRunner.class);
     private final RunConfiguration runConfiguration;
 
     public SiegeRunner(RunConfiguration runConfiguration) {
@@ -38,9 +39,11 @@ public class SiegeRunner {
     }
 
     public void run() throws MavenInvocationException, IOException {
+        // Instantiate EvoSuite now to update the logging context
+        EvoSuite evoSuite = new EvoSuite();
+
         String clientClass = runConfiguration.getClientClass();
         List<Pair<String, VulnerabilityDescription>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
-        // TODO Which Meta-Heuristic would fit better?
         List<String> baseCommands = new ArrayList<>(Arrays.asList(
                 "-generateTests",
                 "-criterion", Properties.Criterion.VULNERABILITY.name(),
@@ -62,8 +65,10 @@ public class SiegeRunner {
                 "-Dtest_dir=siege_tests"
         ));
 
-        // TODO Should select all candidate entry points by exploring the call graph, and then loop over them
+        // TODO Accept an option for arbitrary project, and get the OutputDirectory of the given path, not the CWD
+        // TODO Should run a mvn compile on the target project if possible, otherwise demand the existence of target/classes
         String outputDirectory = getOutputDirectory();
+        System.out.println(outputDirectory);
         if (clientClass != null) {
             baseCommands.add("-class");
             baseCommands.add(clientClass);
@@ -75,23 +80,20 @@ public class SiegeRunner {
         baseCommands.add("-projectCP");
         baseCommands.add(projectCP);
 
-        // TODO Accept an option for arbitrary project path instead of CWD only
         String project = System.getProperty("user.dir");
         String fullProjectPath = (new File(project)).getCanonicalPath();
-        // We have to instantiate EvoSuite to prepare the logging utils, so that the setup is done once for all
-        // TODO I think this problem should be resolved somehow, e.g., using a SIEGE logger, not the EvoSuite one
-        EvoSuite evoSuite = new EvoSuite();
-        LOGGER.info("[SIEGE] Going to generate exploits for {} vulnerabilities through client {}", targetVulnerabilities.size(), fullProjectPath);
+        LOGGER.info("Going to generate exploits for {} vulnerabilities through client {}", targetVulnerabilities.size(), fullProjectPath);
         List<Map<String, String>> results = new ArrayList<>();
         for (int i = 0; i < targetVulnerabilities.size(); i++) {
             Pair<String, VulnerabilityDescription> vulnerability = targetVulnerabilities.get(i);
-            LOGGER.info("\n({}/{}) Going to generate exploits for: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
+            LOGGER.info("({}/{}) Generating exploits for: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
             List<String> evoSuiteCommands = new ArrayList<>(baseCommands);
             evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
             evoSuiteCommands.add("-DvulnClass=" + vulnerability.getRight().getVulnerableClass());
             evoSuiteCommands.add("-DvulnMethod=" + vulnerability.getRight().getVulnerableMethod());
             List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
             try {
+                // TODO There is an error with InheritanceTreeGenerator, might be due the the new JDK -> I might require JDK 9 for EvoSuite, no beyond
                 evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
                         evoSuite.parseCommandLine(evoSuiteCommands.toArray(new String[0]));
             } catch (Exception e) {
