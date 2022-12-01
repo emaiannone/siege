@@ -9,6 +9,8 @@ import org.apache.maven.shared.invoker.InvocationRequest;
 import org.apache.maven.shared.invoker.MavenInvocationException;
 import org.evosuite.EvoSuite;
 import org.evosuite.Properties;
+import org.evosuite.TestGenerationContext;
+import org.evosuite.classpath.ResourceList;
 import org.evosuite.coverage.vulnerability.VulnerabilityDescription;
 import org.evosuite.ga.FitnessFunction;
 import org.evosuite.ga.metaheuristics.GeneticAlgorithm;
@@ -17,13 +19,17 @@ import org.evosuite.ga.stoppingconditions.StoppingCondition;
 import org.evosuite.result.TestGenerationResult;
 import org.evosuite.testcase.TestCase;
 import org.evosuite.testcase.TestChromosome;
-import org.evosuite.utils.LoggingUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -42,7 +48,6 @@ public class SiegeRunner {
         // Instantiate EvoSuite now to update the logging context
         EvoSuite evoSuite = new EvoSuite();
 
-        String clientClass = runConfiguration.getClientClass();
         List<Pair<String, VulnerabilityDescription>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
         List<String> baseCommands = new ArrayList<>(Arrays.asList(
                 "-generateTests",
@@ -65,24 +70,43 @@ public class SiegeRunner {
                 "-Dtest_dir=siege_tests"
         ));
 
-        // TODO Accept an option for arbitrary project, and get the OutputDirectory of the given path, not the CWD
-        // TODO Should run a mvn compile on the target project if possible, otherwise demand the existence of target/classes
-        String outputDirectory = getOutputDirectory();
-        System.out.println(outputDirectory);
-        if (clientClass != null) {
-            baseCommands.add("-class");
-            baseCommands.add(clientClass);
+        Path project = runConfiguration.getProject();
+        String projectDirectory;
+        String classpath;
+        if (!new File(project.toFile(), "pom.xml").exists()) {
+            projectDirectory = project.toString();
+            LOGGER.info("pom.xml file was not found in the target project. Going to analyze .class files in {}.", projectDirectory);
+            classpath = runConfiguration.getClasspath();
+            if (classpath == null) {
+                throw new IllegalArgumentException("The project's classpath must be supplied if the target project is not Maven-based.");
+            }
+            LOGGER.info("The project's classpath was supplied via command-line argument. Going to use {}.", classpath);
         } else {
-            baseCommands.add("-target");
-            baseCommands.add(outputDirectory);
+            // TODO Might need an option that automatically compiles the project first if target/class does not exist yet
+            projectDirectory = getMavenOutputDirectory(project);
+            if (!Files.exists(Paths.get(projectDirectory))) {
+                throw new IllegalArgumentException("The target project must be compiled first.");
+            }
+            LOGGER.info("The target project is a Maven project with compiled sources. Going to analyze .class files in {}.", projectDirectory);
+            classpath = getMavenClasspath(project);
+            LOGGER.info("The project's classpath was collected automatically. Going to use {}", classpath);
         }
-        String projectCP = outputDirectory + ":" + getLibraryClasspath();
         baseCommands.add("-projectCP");
-        baseCommands.add(projectCP);
+        baseCommands.add(projectDirectory + ":" + classpath);
 
-        String project = System.getProperty("user.dir");
-        String fullProjectPath = (new File(project)).getCanonicalPath();
-        LOGGER.info("Going to generate exploits for {} vulnerabilities through client {}", targetVulnerabilities.size(), fullProjectPath);
+        List<String> classNames = new ArrayList<>();
+        String clientClass = runConfiguration.getClientClass();
+        if (clientClass != null) {
+            classNames.add(clientClass);
+        } else {
+            classNames = getClassNames(projectDirectory, classpath);
+            // baseCommands.add("-target");
+            // baseCommands.add(outputDirectory);
+        }
+
+        LOGGER.info("Going to generate tests targeting {} vulnerabilities from {} classes.", targetVulnerabilities.size(), classNames.size());
+        LOGGER.debug("Vulnerabilities: {}", targetVulnerabilities);
+        LOGGER.debug("Client classes: {}", classNames);
         List<Map<String, String>> results = new ArrayList<>();
         for (int i = 0; i < targetVulnerabilities.size(); i++) {
             Pair<String, VulnerabilityDescription> vulnerability = targetVulnerabilities.get(i);
@@ -91,75 +115,84 @@ public class SiegeRunner {
             evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
             evoSuiteCommands.add("-DvulnClass=" + vulnerability.getRight().getVulnerableClass());
             evoSuiteCommands.add("-DvulnMethod=" + vulnerability.getRight().getVulnerableMethod());
-            List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
-            try {
-                // TODO There is an error with InheritanceTreeGenerator, might be due the the new JDK -> I might require JDK 9 for EvoSuite, no beyond
-                evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
-                        evoSuite.parseCommandLine(evoSuiteCommands.toArray(new String[0]));
-            } catch (Exception e) {
-                // Print and go to next iteration
-                LOGGER.error("Error while generating exploits for " + vulnerability.getLeft() + ". Skipping.", e);
-                continue;
-            }
-            LOGGER.info("\n-> Results for {}", vulnerability.getLeft());
-            if (evoSuiteResults.size() > 0) {
-                for (List<TestGenerationResult<TestChromosome>> testResults : evoSuiteResults) {
-                    for (TestGenerationResult<TestChromosome> clientClassResult : testResults) {
-                        Map<String, String> result = new LinkedHashMap<>();
-                        GeneticAlgorithm<TestChromosome> algorithm = clientClassResult.getGeneticAlgorithm();
-                        String clientClassUnderTest = clientClassResult.getClassUnderTest();
-                        result.put("cve", vulnerability.getLeft());
-                        result.put("clientClass", clientClassUnderTest);
-                        Map<String, TestCase> wroteTests = clientClassResult.getTestCases();
-                        if (wroteTests.size() == 0) {
-                            result.putAll(createUnreachableResult());
-                            results.add(result);
-                            LOGGER.info("--> Could not be reached from class '{}'", clientClassUnderTest);
-                            continue;
-                        }
-
-                        // Since EvoSuite does not properly handle the getCurrentValue() method in MaxTimeStoppingCondition, I use an ad hoc method.
-                        // For the same reason, isFinished() is unreliable: we have to use spentBudget <= SEARCH_BUDGET
-                        long spentBudget = 0;
-                        long totalBudget = Properties.SEARCH_BUDGET;
-                        for (StoppingCondition<TestChromosome> stoppingCondition : algorithm.getStoppingConditions()) {
-                            if (stoppingCondition instanceof MaxTimeStoppingCondition) {
-                                MaxTimeStoppingCondition<TestChromosome> timeStoppingCondition = (MaxTimeStoppingCondition<TestChromosome>) stoppingCondition;
-                                spentBudget = timeStoppingCondition.getSpentBudget();
-                                break;
-                            }
-                        }
-                        // Get the individuals covering any goal
-                        TestChromosome bestIndividual = getBestIndividual(algorithm);
-                        // Use ad hoc function because getFitness() offered by EvoSuite does not "fit" our needs
-                        double bestFitness = getBestFitness(bestIndividual);
-                        // Check if budget is not exhausted and at least one goal was covered
-                        if (spentBudget < totalBudget && bestFitness == 0) {
-                            result.put("status", STATUS_SUCCESS);
-                        } else {
-                            result.put("status", STATUS_FAILED);
-                        }
-                        long iterations = algorithm.getAge() + 1;
-
-                        result.put("entryPaths", String.valueOf(algorithm.getFitnessFunctions().size()));
-                        result.put("exploitedPaths", String.valueOf(wroteTests.size()));
-                        result.put("totalBudget", String.valueOf(totalBudget));
-                        result.put("spentBudget", String.valueOf(spentBudget));
-                        result.put("populationSize", String.valueOf(Properties.POPULATION));
-                        result.put("bestFitness", String.valueOf(bestFitness));
-                        result.put("iterations", String.valueOf(iterations));
-                        results.add(result);
-                        LOGGER.info("--> Reached via {}/{} paths from class '{}'", result.get("exploitedPaths"), result.get("entryPaths"), result.get("clientClass"));
-                        LOGGER.info("---> Using {}/{} seconds, within {} iterations.", result.get("spentBudget"), result.get("totalBudget"), result.get("iterations"));
-                    }
+            // TODO Before looping, should do a pre-analysis to filter out classes that do not statically reach any target, and sort them by probability
+            for (String className : classNames) {
+                LOGGER.info("Starting the generation from class {}", className);
+                evoSuiteCommands.add("-class");
+                evoSuiteCommands.add(className);
+                List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
+                try {
+                    // NOTE Sometimes there is an error with InheritanceTreeGenerator, might be due the the new JDK -> I might ask for JDK 9 for EvoSuite, no beyond
+                    // FIXME Loggers inside org.evosuite works when printing on stdout, but not on log file. Plus, I might think to change some prints of the main EvoLogger
+                    // FIXME Apparently the client thread does not start at all, so the master waits for 360 + budget seconds!
+                    evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
+                            evoSuite.parseCommandLine(evoSuiteCommands.toArray(new String[0]));
+                } catch (Exception e) {
+                    // Log and go to next iteration
+                    LOGGER.warn("A problem occurred while generating exploits for {}. Skipping it.", vulnerability.getLeft());
+                    LOGGER.error(ExceptionUtils.getStackTrace(e));
+                    continue;
                 }
-            } else {
-                // TODO Probably this is now unneeded: to be removed. When this is removed, createUnreachableResult() can be inlined
-                Map<String, String> result = new LinkedHashMap<>();
-                result.put("cve", vulnerability.getLeft());
-                result.put("status", STATUS_UNREACHABLE);
-                results.add(result);
-                LOGGER.info("--> Could not be reached from any client class");
+                LOGGER.info("Results for {}", vulnerability.getLeft());
+                if (evoSuiteResults.size() > 0) {
+                    for (List<TestGenerationResult<TestChromosome>> testResults : evoSuiteResults) {
+                        for (TestGenerationResult<TestChromosome> clientClassResult : testResults) {
+                            Map<String, String> result = new LinkedHashMap<>();
+                            GeneticAlgorithm<TestChromosome> algorithm = clientClassResult.getGeneticAlgorithm();
+                            String clientClassUnderTest = clientClassResult.getClassUnderTest();
+                            result.put("cve", vulnerability.getLeft());
+                            result.put("clientClass", clientClassUnderTest);
+                            Map<String, TestCase> wroteTests = clientClassResult.getTestCases();
+                            if (wroteTests.size() == 0) {
+                                result.putAll(createUnreachableResult());
+                                results.add(result);
+                                LOGGER.info("--> Could not be reached from class '{}'", clientClassUnderTest);
+                                continue;
+                            }
+
+                            // Since EvoSuite does not properly handle the getCurrentValue() method in MaxTimeStoppingCondition, I use an ad hoc method.
+                            // For the same reason, isFinished() is unreliable: we have to use spentBudget <= SEARCH_BUDGET
+                            long spentBudget = 0;
+                            long totalBudget = Properties.SEARCH_BUDGET;
+                            for (StoppingCondition<TestChromosome> stoppingCondition : algorithm.getStoppingConditions()) {
+                                if (stoppingCondition instanceof MaxTimeStoppingCondition) {
+                                    MaxTimeStoppingCondition<TestChromosome> timeStoppingCondition = (MaxTimeStoppingCondition<TestChromosome>) stoppingCondition;
+                                    spentBudget = timeStoppingCondition.getSpentBudget();
+                                    break;
+                                }
+                            }
+                            // Get the individuals covering any goal
+                            TestChromosome bestIndividual = getBestIndividual(algorithm);
+                            // Use ad hoc function because getFitness() offered by EvoSuite does not "fit" our needs
+                            double bestFitness = getBestFitness(bestIndividual);
+                            // Check if budget is not exhausted and at least one goal was covered
+                            if (spentBudget < totalBudget && bestFitness == 0) {
+                                result.put("status", STATUS_SUCCESS);
+                            } else {
+                                result.put("status", STATUS_FAILED);
+                            }
+                            long iterations = algorithm.getAge() + 1;
+
+                            result.put("entryPaths", String.valueOf(algorithm.getFitnessFunctions().size()));
+                            result.put("exploitedPaths", String.valueOf(wroteTests.size()));
+                            result.put("totalBudget", String.valueOf(totalBudget));
+                            result.put("spentBudget", String.valueOf(spentBudget));
+                            result.put("populationSize", String.valueOf(Properties.POPULATION));
+                            result.put("bestFitness", String.valueOf(bestFitness));
+                            result.put("iterations", String.valueOf(iterations));
+                            results.add(result);
+                            LOGGER.info("--> Reached via {}/{} paths from class '{}'", result.get("exploitedPaths"), result.get("entryPaths"), result.get("clientClass"));
+                            LOGGER.info("---> Using {}/{} seconds, within {} iterations.", result.get("spentBudget"), result.get("totalBudget"), result.get("iterations"));
+                        }
+                    }
+                } else {
+                    // TODO Probably this is now unneeded: to be removed. When this is removed, createUnreachableResult() can be inlined
+                    Map<String, String> result = new LinkedHashMap<>();
+                    result.put("cve", vulnerability.getLeft());
+                    result.put("status", STATUS_UNREACHABLE);
+                    results.add(result);
+                    LOGGER.info("--> Could not be reached from any client class");
+                }
             }
         }
 
@@ -176,7 +209,7 @@ public class SiegeRunner {
         }
     }
 
-    private void callMaven(List<String> goals) throws IOException, MavenInvocationException {
+    private void callMaven(List<String> goals, Path directory) throws IOException, MavenInvocationException {
         if (System.getProperty("maven.home") == null) {
             Runtime rt = Runtime.getRuntime();
             String[] commands = {"whereis", "mvn"};
@@ -186,35 +219,42 @@ public class SiegeRunner {
             String mavenHome = stdInput.readLine().split(" ")[1];
             System.setProperty("maven.home", mavenHome);
         }
-        String cwd = System.getProperty("user.dir");
-        File tmpfile = File.createTempFile("tmp", ".txt");
         InvocationRequest request = new DefaultInvocationRequest();
-        request.setBaseDirectory(new File(cwd));
+        request.setBaseDirectory(directory.toFile());
         request.setGoals(goals);
         request.setBatchMode(true);
         new DefaultInvoker().execute(request);
     }
 
     // https://maven.apache.org/plugins/maven-help-plugin/evaluate-mojo.html
-    private String getOutputDirectory() throws IOException, MavenInvocationException {
+    private String getMavenOutputDirectory(Path directory) throws IOException, MavenInvocationException {
         File tmpfile = File.createTempFile("tmp", ".txt");
         try {
-            callMaven(Arrays.asList("help:evaluate", "-Dexpression=project.build.outputDirectory", "-q", "-B", "-Doutput=" + tmpfile.getAbsolutePath()));
-            return IOUtils.toString(new FileInputStream(tmpfile), StandardCharsets.UTF_8.name());
+            callMaven(Arrays.asList("help:evaluate", "-Dexpression=project.build.outputDirectory", "-q", "-B", "-Doutput=" + tmpfile.getAbsolutePath()), directory);
+            return IOUtils.toString(Files.newInputStream(tmpfile.toPath()), StandardCharsets.UTF_8);
         } finally {
             tmpfile.delete();
         }
     }
 
     // http://maven.apache.org/plugins/maven-dependency-plugin/usage.html#dependency:build-classpath
-    private String getLibraryClasspath() throws IOException, MavenInvocationException {
+    private String getMavenClasspath(Path directory) throws IOException, MavenInvocationException {
         File tmpfile = File.createTempFile("tmp", ".txt");
         try {
-            callMaven(Arrays.asList("dependency:build-classpath", "-q", "-B", "-Dmdep.outputFile=" + tmpfile.getAbsolutePath()));
-            return IOUtils.toString(new FileInputStream(tmpfile), StandardCharsets.UTF_8.name());
+            callMaven(Arrays.asList("dependency:build-classpath", "-q", "-B", "-Dmdep.outputFile=" + tmpfile.getAbsolutePath()), directory);
+            return IOUtils.toString(Files.newInputStream(tmpfile.toPath()), StandardCharsets.UTF_8);
         } finally {
             tmpfile.delete();
         }
+    }
+
+    private List<String> getClassNames(String projectDirectory, String classpath) {
+        String oldPropertiesCP = Properties.CP;
+        Properties.CP = classpath;
+        ResourceList resourceList = ResourceList.getInstance(TestGenerationContext.getInstance().getClassLoaderForSUT());
+        ArrayList<String> classNames = new ArrayList<>(resourceList.getAllClasses(projectDirectory, false));
+        Properties.CP = oldPropertiesCP;
+        return classNames;
     }
 
     /*

@@ -15,7 +15,7 @@ public class CLIStarter {
             SiegeRunner siegeRunner = new SiegeRunner(runConfiguration);
             siegeRunner.run();
         } catch (Exception e) {
-            //LOGGER.error("\t* {}", ExceptionUtils.getStackTrace(e));
+            LOGGER.error(ExceptionUtils.getStackTrace(e));
             System.exit(1);
         }
     }

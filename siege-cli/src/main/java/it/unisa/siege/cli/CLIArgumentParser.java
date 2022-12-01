@@ -36,6 +36,16 @@ public class CLIArgumentParser {
             return null;
         }
 
+        String project = commandLine.getOptionValue(CLIOptions.PROJECT_OPT);
+        if (project == null) {
+            throw new IOException("The project path was not specified.");
+        }
+        Path projectPath = Paths.get(project);
+        if (!Files.exists(projectPath)) {
+            throw new IOException("The supplied project path must point to an existing directory.");
+        }
+
+        String classpath = commandLine.getOptionValue(CLIOptions.CLASSPATH_OPT);
         String clientClass = commandLine.getOptionValue(CLIOptions.CLIENT_CLASS_OPT);
 
         // Get the target vulnerability(ies)
@@ -81,6 +91,6 @@ public class CLIArgumentParser {
 
         String outFileArg = commandLine.getOptionValue(CLIOptions.OUT_FILE_OPT);
         Path outFilePath = outFileArg != null ? Paths.get(outFileArg) : null;
-        return new RunConfiguration(clientClass, vulnerabilityList, budget, popSize, outFilePath);
+        return new RunConfiguration(projectPath, classpath, clientClass, vulnerabilityList, budget, popSize, outFilePath);
     }
 }
