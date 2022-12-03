@@ -29,3 +29,6 @@ dependency-reduced-pom.xml
 *.iml
 *.ipr
 *.iws
+
+siege_tests/
+evosuite-report/

@@ -82,7 +82,7 @@ public class SiegeRunner {
             }
             LOGGER.info("The project's classpath was supplied via command-line argument. Going to use {}.", classpath);
         } else {
-            // TODO Might need an option that automatically compiles the project first if target/class does not exist yet
+            // TODO Might need an option that automatically compiles the project (with the supplied Maven executable) first if target/class does not exist yet
             projectDirectory = getMavenOutputDirectory(project);
             if (!Files.exists(Paths.get(projectDirectory))) {
                 throw new IllegalArgumentException("The target project must be compiled first.");
@@ -123,8 +123,7 @@ public class SiegeRunner {
                 List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
                 try {
                     // NOTE Sometimes there is an error with InheritanceTreeGenerator, might be due the the new JDK -> I might ask for JDK 9 for EvoSuite, no beyond
-                    // FIXME Loggers inside org.evosuite works when printing on stdout, but not on log file. Plus, I might think to change some prints of the main EvoLogger
-                    // FIXME Apparently the client thread does not start at all, so the master waits for 360 + budget seconds!
+                    // FIXME The generations starts, but the generation fails, MASTER logs too much, and CLIENT nothing. Plus, I might think to change some prints of the main EvoLogger
                     evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
                             evoSuite.parseCommandLine(evoSuiteCommands.toArray(new String[0]));
                 } catch (Exception e) {

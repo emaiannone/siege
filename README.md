@@ -5,7 +5,7 @@ on [EvoSuite](https://github.com/EvoSuite/evosuite).
 
 # Requirements
 
-- JDK version 8+
+- JDK 9 (higher version might not start the test generation)
 - Maven
 
 # Building SIEGE

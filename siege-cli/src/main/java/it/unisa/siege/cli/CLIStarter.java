@@ -14,6 +14,7 @@ public class CLIStarter {
             RunConfiguration runConfiguration = CLIArgumentParser.parse(args);
             SiegeRunner siegeRunner = new SiegeRunner(runConfiguration);
             siegeRunner.run();
+            System.exit(0);
         } catch (Exception e) {
             LOGGER.error(ExceptionUtils.getStackTrace(e));
             System.exit(1);
