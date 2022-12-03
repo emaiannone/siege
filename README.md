@@ -16,4 +16,4 @@ Create the executable fat jar (if you want to run all the tests, remove the opti
 # Running SIEGE
 
 Run the executable fat JAR:  
-`java -jar target/siege-cli<VERSION>-jar-with-dependencies.json <ARGS>`
+`java -Dmaven.home=<MVN_DIR> -jar target/siege-cli<VERSION>-jar-with-dependencies.json <CLI_OPTIONS>`

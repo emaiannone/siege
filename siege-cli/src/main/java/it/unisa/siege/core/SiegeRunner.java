@@ -211,13 +211,16 @@ public class SiegeRunner {
 
     private void callMaven(List<String> goals, Path directory) throws IOException, MavenInvocationException {
         if (System.getProperty("maven.home") == null) {
-            Runtime rt = Runtime.getRuntime();
-            String[] commands = {"whereis", "mvn"};
-            Process proc = rt.exec(commands);
+            // Try to find mvn location
+            ProcessBuilder whichMvn = new ProcessBuilder("which", "mvn");
+            Process proc = whichMvn.start();
             BufferedReader stdInput = new BufferedReader(new InputStreamReader(proc.getInputStream()));
-            // Read the output from the command
-            String mavenHome = stdInput.readLine().split(" ")[1];
-            System.setProperty("maven.home", mavenHome);
+            String mavenHome = stdInput.readLine();
+            if (mavenHome == null) {
+                throw new IOException("Could not find Maven. Must supply the directory where Maven can be found via -Dmaven.home JVM property");
+            } else {
+                System.setProperty("maven.home", mavenHome);
+            }
         }
         InvocationRequest request = new DefaultInvocationRequest();
         request.setBaseDirectory(directory.toFile());
