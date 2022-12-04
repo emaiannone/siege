@@ -45,8 +45,8 @@ public class SiegeRunner {
     }
 
     public void run() throws MavenInvocationException, IOException {
-        // Instantiate EvoSuite now to update the logging context
-        EvoSuite evoSuite = new EvoSuite();
+        // Instantiate EvoSuite now only to update the logging context
+        new EvoSuite();
 
         List<Pair<String, VulnerabilityDescription>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
         List<String> baseCommands = new ArrayList<>(Arrays.asList(
@@ -110,14 +110,14 @@ public class SiegeRunner {
         List<Map<String, String>> results = new ArrayList<>();
         for (int i = 0; i < targetVulnerabilities.size(); i++) {
             Pair<String, VulnerabilityDescription> vulnerability = targetVulnerabilities.get(i);
-            LOGGER.info("({}/{}) Generating exploits for: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
+            LOGGER.info("({}/{}) Going to generate tests to reach: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
             List<String> evoSuiteCommands = new ArrayList<>(baseCommands);
             evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
             evoSuiteCommands.add("-DvulnClass=" + vulnerability.getRight().getVulnerableClass());
             evoSuiteCommands.add("-DvulnMethod=" + vulnerability.getRight().getVulnerableMethod());
             // TODO Before looping, should do a pre-analysis to filter out classes that do not statically reach any target, and sort them by probability
             for (String className : classNames) {
-                LOGGER.info("Starting the generation from class {}", className);
+                LOGGER.info("Starting the generation from class: {}", className);
                 evoSuiteCommands.add("-class");
                 evoSuiteCommands.add(className);
                 List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
@@ -125,7 +125,7 @@ public class SiegeRunner {
                     // NOTE Sometimes there is an error with InheritanceTreeGenerator, might be due the the new JDK -> I might ask for JDK 9 for EvoSuite, no beyond
                     // FIXME The generations starts, but the generation fails, MASTER logs too much, and CLIENT nothing. Plus, I might think to change some prints of the main EvoLogger
                     evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
-                            evoSuite.parseCommandLine(evoSuiteCommands.toArray(new String[0]));
+                            new EvoSuite().parseCommandLine(evoSuiteCommands.toArray(new String[0]));
                 } catch (Exception e) {
                     // Log and go to next iteration
                     LOGGER.warn("A problem occurred while generating exploits for {}. Skipping it.", vulnerability.getLeft());
@@ -145,7 +145,7 @@ public class SiegeRunner {
                             if (wroteTests.size() == 0) {
                                 result.putAll(createUnreachableResult());
                                 results.add(result);
-                                LOGGER.info("--> Could not be reached from class '{}'", clientClassUnderTest);
+                                LOGGER.info("|-> Could not be reached from class '{}'", clientClassUnderTest);
                                 continue;
                             }
 
@@ -180,8 +180,8 @@ public class SiegeRunner {
                             result.put("bestFitness", String.valueOf(bestFitness));
                             result.put("iterations", String.valueOf(iterations));
                             results.add(result);
-                            LOGGER.info("--> Reached via {}/{} paths from class '{}'", result.get("exploitedPaths"), result.get("entryPaths"), result.get("clientClass"));
-                            LOGGER.info("---> Using {}/{} seconds, within {} iterations.", result.get("spentBudget"), result.get("totalBudget"), result.get("iterations"));
+                            LOGGER.info("|-> Reached via {}/{} paths from class '{}'", result.get("exploitedPaths"), result.get("entryPaths"), result.get("clientClass"));
+                            LOGGER.info("|-> Using {}/{} seconds, within {} iterations.", result.get("spentBudget"), result.get("totalBudget"), result.get("iterations"));
                         }
                     }
                 } else {
