@@ -91,6 +91,10 @@ public class CLIArgumentParser {
 
         String outFileArg = commandLine.getOptionValue(CLIOptions.OUT_FILE_OPT);
         Path outFilePath = outFileArg != null ? Paths.get(outFileArg) : null;
-        return new RunConfiguration(projectPath, classpath, clientClass, vulnerabilityList, budget, popSize, outFilePath);
+
+        String logDirArg = commandLine.getOptionValue(CLIOptions.LOG_DIR_OPT);
+        Path logDirPath = logDirArg != null ? Paths.get(logDirArg) : null;
+
+        return new RunConfiguration(projectPath, classpath, clientClass, vulnerabilityList, budget, popSize, outFilePath, logDirPath);
     }
 }

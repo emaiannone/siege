@@ -14,8 +14,9 @@ public class RunConfiguration {
     private final int budget;
     private final int populationSize;
     private final Path outFilePath;
+    private final Path logDirPath;
 
-    public RunConfiguration(Path project, String classpath, String clientClass, List<Pair<String, VulnerabilityDescription>> targetVulnerabilities, int budget, int populationSize, Path outFilePath) {
+    public RunConfiguration(Path project, String classpath, String clientClass, List<Pair<String, VulnerabilityDescription>> targetVulnerabilities, int budget, int populationSize, Path outFilePath, Path logDirPath) {
         this.project = project;
         this.classpath = classpath;
         this.clientClass = clientClass;
@@ -23,6 +24,7 @@ public class RunConfiguration {
         this.budget = budget;
         this.populationSize = populationSize;
         this.outFilePath = outFilePath;
+        this.logDirPath = logDirPath;
     }
 
     public Path getProject() {
@@ -51,5 +53,9 @@ public class RunConfiguration {
 
     public Path getOutFilePath() {
         return outFilePath;
+    }
+
+    public Path getLogDirPath() {
+        return logDirPath;
     }
 }

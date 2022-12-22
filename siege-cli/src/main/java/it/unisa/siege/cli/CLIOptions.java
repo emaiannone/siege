@@ -11,6 +11,7 @@ public class CLIOptions extends Options {
     public static final String BUDGET_OPT = "budget";
     public static final String POP_SIZE_OPT = "populationSize";
     public static final String OUT_FILE_OPT = "outFile";
+    public static final String LOG_DIR_OPT = "logDir";
     public static final String HELP_OPT = "help";
     public static final int BUDGET_DEFAUlT = 60;
     public static final int POP_SIZE_DEFAUlT = 100;
@@ -52,6 +53,11 @@ public class CLIOptions extends Options {
                 .desc("Path to a .csv file where the results will be written. If not specified, the results are printed on the standard output.")
                 .build();
 
+        Option logDirOpt = Option.builder(LOG_DIR_OPT)
+                .hasArg(true)
+                .desc("Path to a directory where the detail of the generations will be stored.")
+                .build();
+
         Option helpOpt = Option.builder(HELP_OPT)
                 .hasArg(false)
                 .desc("Show the options available, ignoring all other options used.")
@@ -64,6 +70,7 @@ public class CLIOptions extends Options {
         addOption(budgetOpt);
         addOption(populationOpt);
         addOption(outFileOpt);
+        addOption(logDirOpt);
         addOption(helpOpt);
     }
 

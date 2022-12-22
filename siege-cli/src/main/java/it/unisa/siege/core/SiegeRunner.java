@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -46,7 +47,7 @@ public class SiegeRunner {
 
     public void run() throws MavenInvocationException, IOException {
         // Instantiate EvoSuite now only to update the logging context
-        new EvoSuite();
+        EvoSuite evoSuite = new EvoSuite();
 
         List<Pair<String, VulnerabilityDescription>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
         List<String> baseCommands = new ArrayList<>(Arrays.asList(
@@ -104,6 +105,17 @@ public class SiegeRunner {
             // baseCommands.add(outputDirectory);
         }
 
+        // Create the generation logging directory
+        File generationLogDir = runConfiguration.getLogDirPath().toFile();
+        if (!generationLogDir.exists()) {
+            if (generationLogDir.mkdirs()) {
+                LOGGER.info("Set {} as the generation log directory.", generationLogDir.getCanonicalPath());
+            } else {
+                generationLogDir = null;
+                LOGGER.warn("Failed to create the generation log directory. No generation details will be logged.");
+            }
+        }
+
         LOGGER.info("Going to generate tests targeting {} vulnerabilities from {} classes.", targetVulnerabilities.size(), classNames.size());
         LOGGER.debug("Vulnerabilities: {}", targetVulnerabilities);
         LOGGER.debug("Client classes: {}", classNames);
@@ -111,10 +123,24 @@ public class SiegeRunner {
         for (int i = 0; i < targetVulnerabilities.size(); i++) {
             Pair<String, VulnerabilityDescription> vulnerability = targetVulnerabilities.get(i);
             LOGGER.info("({}/{}) Going to generate tests to reach: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
+            // Create the generation logging file for this run
+            File generationLogFile = null;
+            if (generationLogDir != null && generationLogDir.exists()) {
+                generationLogFile = Paths.get(generationLogDir.getCanonicalPath(), new SimpleDateFormat("yyyy_MM_dd_h_mm_ss").format(new Date()) + ".log").toFile();
+                try {
+                    if (generationLogFile.createNewFile()) {
+                        LOGGER.info("Set {} as the generation log file.", generationLogFile);
+                    }
+                } catch (IOException e) {
+                    LOGGER.warn("Failed to create the generation log file. No generation details will be logged.");
+                }
+            }
+
             List<String> evoSuiteCommands = new ArrayList<>(baseCommands);
             evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
-            evoSuiteCommands.add("-DvulnClass=" + vulnerability.getRight().getVulnerableClass());
-            evoSuiteCommands.add("-DvulnMethod=" + vulnerability.getRight().getVulnerableMethod());
+            evoSuiteCommands.add("-DsiegeTargetClass=" + vulnerability.getRight().getVulnerableClass());
+            evoSuiteCommands.add("-DsiegeTargetMethod=" + vulnerability.getRight().getVulnerableMethod());
+            evoSuiteCommands.add("-DsiegeLogFile=" + (generationLogFile != null ? generationLogFile : ""));
             // TODO Before looping, should do a pre-analysis to filter out classes that do not statically reach any target, and sort them by probability
             for (String className : classNames) {
                 LOGGER.info("Starting the generation from class: {}", className);
@@ -122,10 +148,8 @@ public class SiegeRunner {
                 evoSuiteCommands.add(className);
                 List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
                 try {
-                    // NOTE Sometimes there is an error with InheritanceTreeGenerator, might be due the the new JDK -> I might ask for JDK 9 for EvoSuite, no beyond
-                    // FIXME The generations starts, but the generation fails, MASTER logs too much, and CLIENT nothing. Plus, I might think to change some prints of the main EvoLogger
                     evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
-                            new EvoSuite().parseCommandLine(evoSuiteCommands.toArray(new String[0]));
+                            evoSuite.parseCommandLine(evoSuiteCommands.toArray(new String[0]));
                 } catch (Exception e) {
                     // Log and go to next iteration
                     LOGGER.warn("A problem occurred while generating exploits for {}. Skipping it.", vulnerability.getLeft());
