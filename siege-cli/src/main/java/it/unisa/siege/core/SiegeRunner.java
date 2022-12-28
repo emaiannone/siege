@@ -38,6 +38,7 @@ public class SiegeRunner {
     public static final String STATUS_UNREACHABLE = "UNREACHABLE";
     public static final String STATUS_SUCCESS = "SUCCESS";
     public static final String STATUS_FAILED = "FAILED";
+    public static final String OUTPUT_DIR = "siege_tests";
     private static final Logger LOGGER = LoggerFactory.getLogger(SiegeRunner.class);
     private final RunConfiguration runConfiguration;
 
@@ -68,7 +69,7 @@ public class SiegeRunner {
                 "-Dprint_covered_goals=true",
                 "-Dprint_missed_goals=true",
                 //"-Dshow_progress=false",
-                "-Dtest_dir=siege_tests"
+                "-Dtest_dir=" + OUTPUT_DIR
         ));
 
         Path project = runConfiguration.getProject();
@@ -135,7 +136,8 @@ public class SiegeRunner {
             Pair<String, VulnerabilityDescription> vulnerability = targetVulnerabilities.get(i);
             LOGGER.info("({}/{}) Going to generate tests to reach: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
             List<String> evoSuiteCommands = new ArrayList<>(baseCommands);
-            evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft() + "_SiegeTest");
+            // NOTE Must replace hyphens with underscores to avoid errors while compiling the tests
+            evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
             evoSuiteCommands.add("-DsiegeTargetClass=" + vulnerability.getRight().getVulnerableClass());
             evoSuiteCommands.add("-DsiegeTargetMethod=" + vulnerability.getRight().getVulnerableMethod());
             // TODO Before looping, should do a pre-analysis to filter out classes that do not statically reach any target, and sort them by probability
@@ -166,6 +168,7 @@ public class SiegeRunner {
                     LOGGER.error(ExceptionUtils.getStackTrace(e));
                     continue;
                 }
+                // TODO Post-processing: remove empty test files in OUTPUT_DIR (i.e., the files having "public void notGeneratedAnyTest()" as the only method and its scaffolding) -> Enable an option to keepEmptyTests and an option to select the outDir (just like logDir)
                 LOGGER.info("Results for {}", vulnerability.getLeft());
                 if (evoSuiteResults.size() > 0) {
                     for (List<TestGenerationResult<TestChromosome>> testResults : evoSuiteResults) {
