@@ -40,7 +40,6 @@ public class SiegeRunner {
     public static final String STATUS_UNREACHABLE = "UNREACHABLE";
     public static final String STATUS_SUCCESS = "SUCCESS";
     public static final String STATUS_FAILED = "FAILED";
-    public static final String OUTPUT_DIR = "siege_tests";
     private static final Logger LOGGER = LoggerFactory.getLogger(SiegeRunner.class);
     private final RunConfiguration runConfiguration;
 
@@ -49,10 +48,11 @@ public class SiegeRunner {
     }
 
     public void run() throws MavenInvocationException, IOException {
-        // Instantiate EvoSuite now only to update the logging context
+        // Instantiate EvoSuite now just to update the logging context
         EvoSuite evoSuite = new EvoSuite();
-
-        List<Pair<String, VulnerabilityDescription>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
+        LOGGER.info("Going to use {} seconds budget.", runConfiguration.getBudget());
+        LOGGER.info("Going to evolve populations of {} individuals.", runConfiguration.getPopulationSize());
+        LOGGER.info("Going to write tests in directory {}.", runConfiguration.getTestsDirPath().toFile().getCanonicalPath());
         List<String> baseCommands = new ArrayList<>(Arrays.asList(
                 "-generateTests",
                 "-criterion", Properties.Criterion.VULNERABILITY.name(),
@@ -71,7 +71,7 @@ public class SiegeRunner {
                 "-Dprint_covered_goals=true",
                 "-Dprint_missed_goals=true",
                 //"-Dshow_progress=false",
-                "-Dtest_dir=" + OUTPUT_DIR
+                "-Dtest_dir=" + runConfiguration.getTestsDirPath()
         ));
 
         Path project = runConfiguration.getProject();
@@ -118,25 +118,26 @@ public class SiegeRunner {
         }
         File generationLogDir = null;
         if (generationLogBaseDir != null) {
-            generationLogDir = Paths.get(generationLogBaseDir.getCanonicalPath(), new SimpleDateFormat("yyyy_MM_dd_h_mm_ss").format(new Date())).toFile();
+            generationLogDir = Paths.get(generationLogBaseDir.getCanonicalPath(), new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date())).toFile();
             if (!generationLogDir.exists()) {
                 if (generationLogDir.mkdirs()) {
-                    LOGGER.info("Generation log directory {} successfully created. Going to write the generation log there.", generationLogDir.getCanonicalPath());
+                    LOGGER.info("Going to write the generation log in directory {}.", generationLogDir.getCanonicalPath());
                 } else {
                     LOGGER.warn("Failed to create the generation log directory. No generation log will be written for all runs.");
                 }
             } else {
-                LOGGER.info("Generation log directory {} already exists. Going to write the generation log there.", generationLogDir.getCanonicalPath());
+                LOGGER.info("Going to write the generation log in directory {}.", generationLogDir.getCanonicalPath());
             }
         }
 
+        List<Pair<String, VulnerabilityDescription>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
         LOGGER.info("Going to generate tests targeting {} vulnerabilities from {} classes.", targetVulnerabilities.size(), classNames.size());
         LOGGER.debug("Vulnerabilities: {}", targetVulnerabilities);
         LOGGER.debug("Client classes: {}", classNames);
         List<Map<String, String>> allResults = new ArrayList<>();
         for (int i = 0; i < targetVulnerabilities.size(); i++) {
             Pair<String, VulnerabilityDescription> vulnerability = targetVulnerabilities.get(i);
-            LOGGER.info("({}/{}) Going to generate tests to reach: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
+            LOGGER.info("({}/{}) Generating tests for: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
             List<String> evoSuiteCommands = new ArrayList<>(baseCommands);
             // NOTE Must replace hyphens with underscores to avoid errors while compiling the tests
             evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
@@ -144,14 +145,14 @@ public class SiegeRunner {
             evoSuiteCommands.add("-DsiegeTargetMethod=" + vulnerability.getRight().getVulnerableMethod());
             // TODO Before looping, should do a pre-analysis to filter out classes that do not statically reach any target, and sort them by a measure of probability to prioritize
             for (String className : classNames) {
-                LOGGER.info("Starting the generation from class: {}", className);
+                LOGGER.info("Starting from class: {}", className);
                 // Create the generation logging file for this run
                 File generationLogFile = null;
                 if (generationLogDir != null && generationLogDir.exists()) {
                     generationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", className.substring(className.lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
                     try {
                         if (generationLogFile.createNewFile()) {
-                            LOGGER.info("Generation log file {} successfully created. Going to write the generation log there.", generationLogFile);
+                            LOGGER.info("Going to write the generation log in file {}.", generationLogFile);
                         }
                     } catch (IOException e) {
                         LOGGER.warn("Failed to create the generation log file. No generation log will be written for this run.");
@@ -170,8 +171,8 @@ public class SiegeRunner {
                     LOGGER.error(ExceptionUtils.getStackTrace(e));
                     continue;
                 }
-                // TODO Call this if -keepEmptyTests is not set. Also add a new option to select the -outDir (just like -logDir)
-                deleteEmptyTestFiles();
+                // TODO Call this only if -keepEmptyTests (a new option to add) is not set.
+                deleteEmptyTestFiles(runConfiguration.getTestsDirPath());
 
                 addResults(allResults, evoSuiteResults, vulnerability.getLeft());
             }
@@ -344,9 +345,9 @@ public class SiegeRunner {
         return Collections.min(individual.getFitnessValues().values());
     }
 
-    private void deleteEmptyTestFiles() throws IOException {
+    private void deleteEmptyTestFiles(Path testsDirPath) throws IOException {
         List<Path> outputFiles;
-        try (Stream<Path> stream = Files.walk(Paths.get(OUTPUT_DIR))) {
+        try (Stream<Path> stream = Files.walk(testsDirPath)) {
             outputFiles = stream.filter(Files::isRegularFile)
                     .filter(f -> FilenameUtils.getExtension(String.valueOf(f)).equals("java")).collect(Collectors.toList());
         }

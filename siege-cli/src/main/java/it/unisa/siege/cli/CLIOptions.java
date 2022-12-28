@@ -10,11 +10,13 @@ public class CLIOptions extends Options {
     public static final String VULNERABILITIES_OPT = "vulnerabilities";
     public static final String BUDGET_OPT = "budget";
     public static final String POP_SIZE_OPT = "populationSize";
+    public static final String TESTS_DIR_OPT = "testsDir";
     public static final String OUT_FILE_OPT = "outFile";
     public static final String LOG_DIR_OPT = "logDir";
     public static final String HELP_OPT = "help";
     public static final int BUDGET_DEFAUlT = 60;
     public static final int POP_SIZE_DEFAUlT = 100;
+    public static final String TESTS_DIR_DEFAULT = "./siege_tests";
     private static CLIOptions INSTANCE;
 
     private CLIOptions() {
@@ -48,6 +50,11 @@ public class CLIOptions extends Options {
                 .desc(String.format("An integer indicating the number of test cases in each generation. Must be greater than 1. If not specified, it defaults to %s", POP_SIZE_DEFAUlT))
                 .build();
 
+        Option testsDirOpt = Option.builder(TESTS_DIR_OPT)
+                .hasArg(true)
+                .desc("Path to a directory where the Siege's JUnit test files will be stored.")
+                .build();
+
         Option outFileOpt = Option.builder(OUT_FILE_OPT)
                 .hasArg(true)
                 .desc("Path to a .csv file where the results will be written. If not specified, the results are printed on the standard output.")
@@ -69,6 +76,7 @@ public class CLIOptions extends Options {
         addOption(vulnerabilitiesOpt);
         addOption(budgetOpt);
         addOption(populationOpt);
+        addOption(testsDirOpt);
         addOption(outFileOpt);
         addOption(logDirOpt);
         addOption(helpOpt);

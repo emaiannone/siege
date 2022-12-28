@@ -81,12 +81,15 @@ public class CLIArgumentParser {
             }
         }
 
+        String testsDirArg = commandLine.getOptionValue(CLIOptions.TESTS_DIR_OPT);
+        Path testsDirPath = Paths.get(testsDirArg != null ? testsDirArg : CLIOptions.TESTS_DIR_DEFAULT);
+
         String outFileArg = commandLine.getOptionValue(CLIOptions.OUT_FILE_OPT);
         Path outFilePath = outFileArg != null ? Paths.get(outFileArg) : null;
 
         String logDirArg = commandLine.getOptionValue(CLIOptions.LOG_DIR_OPT);
         Path logDirPath = logDirArg != null ? Paths.get(logDirArg) : null;
 
-        return new RunConfiguration(projectPath, classpath, clientClass, vulnerabilityList, budget, popSize, outFilePath, logDirPath);
+        return new RunConfiguration(projectPath, classpath, clientClass, vulnerabilityList, budget, popSize, testsDirPath, outFilePath, logDirPath);
     }
 }
