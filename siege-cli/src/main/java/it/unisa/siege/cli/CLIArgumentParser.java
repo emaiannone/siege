@@ -1,15 +1,11 @@
 package it.unisa.siege.cli;
 
-import com.opencsv.exceptions.CsvValidationException;
 import it.unisa.siege.core.RunConfiguration;
 import it.unisa.siege.core.SiegeIO;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.tuple.Pair;
 import org.evosuite.coverage.vulnerability.VulnerabilityDescription;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,8 +17,6 @@ public class CLIArgumentParser {
     public static final String HEADER = "Siege: an automated test case generator targeting any method in the classpath.\n\nOptions:";
     public static final String SYNTAX = "java -jar siege.jar";
     public static final String FOOTER = "\nPlease report any issue at https://github.com/emaiannone/siege";
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(CLIArgumentParser.class);
 
     public static RunConfiguration parse(String[] args) throws ParseException, IOException {
         // Fetch the indicated CLI options
@@ -53,10 +47,8 @@ public class CLIArgumentParser {
         List<Pair<String, VulnerabilityDescription>> vulnerabilityList;
         try {
             vulnerabilityList = new ArrayList<>(SiegeIO.readAndParseCsv(Paths.get(vulnerabilitiesFilePath)));
-        } catch (FileNotFoundException e) {
-            throw new IOException("Cannot find the CSV containing the vulnerabilities.", e);
-        } catch (CsvValidationException e) {
-            throw new IOException("Cannot parse the CSV containing the vulnerabilities.", e);
+        } catch (IOException e) {
+            throw new IOException("Cannot find or parse the CSV containing the vulnerabilities.", e);
         }
 
         String budgetArg = commandLine.getOptionValue(CLIOptions.BUDGET_OPT);

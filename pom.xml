@@ -33,6 +33,7 @@
 
     <modules>
         <module>siege-cli</module>
+        <module>siege-core</module>
         <module>exploit-generation</module>
     </modules>
 
