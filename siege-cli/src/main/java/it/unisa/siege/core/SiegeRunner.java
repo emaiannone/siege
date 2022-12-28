@@ -106,13 +106,24 @@ public class SiegeRunner {
         }
 
         // Create the generation logging directory
-        File generationLogDir = runConfiguration.getLogDirPath().toFile();
-        if (!generationLogDir.exists()) {
-            if (generationLogDir.mkdirs()) {
-                LOGGER.info("Set {} as the generation log directory.", generationLogDir.getCanonicalPath());
-            } else {
-                generationLogDir = null;
+        File generationLogBaseDir = runConfiguration.getLogDirPath().toFile();
+        if (!generationLogBaseDir.exists()) {
+            if (!generationLogBaseDir.mkdirs()) {
+                generationLogBaseDir = null;
                 LOGGER.warn("Failed to create the generation log directory. No generation details will be logged.");
+            }
+        }
+        File generationLogDir = null;
+        if (generationLogBaseDir != null) {
+            generationLogDir = Paths.get(generationLogBaseDir.getCanonicalPath(), new SimpleDateFormat("yyyy_MM_dd_h_mm_ss").format(new Date())).toFile();
+            if (!generationLogDir.exists()) {
+                if (generationLogDir.mkdirs()) {
+                    LOGGER.info("Generation log directory {} successfully created. Going to write the generation log there.", generationLogDir.getCanonicalPath());
+                } else {
+                    LOGGER.warn("Failed to create the generation log directory. No generation log will be written for all runs.");
+                }
+            } else {
+                LOGGER.info("Generation log directory {} already exists. Going to write the generation log there.", generationLogDir.getCanonicalPath());
             }
         }
 
@@ -123,27 +134,26 @@ public class SiegeRunner {
         for (int i = 0; i < targetVulnerabilities.size(); i++) {
             Pair<String, VulnerabilityDescription> vulnerability = targetVulnerabilities.get(i);
             LOGGER.info("({}/{}) Going to generate tests to reach: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
-            // Create the generation logging file for this run
-            File generationLogFile = null;
-            if (generationLogDir != null && generationLogDir.exists()) {
-                generationLogFile = Paths.get(generationLogDir.getCanonicalPath(), new SimpleDateFormat("yyyy_MM_dd_h_mm_ss").format(new Date()) + ".log").toFile();
-                try {
-                    if (generationLogFile.createNewFile()) {
-                        LOGGER.info("Set {} as the generation log file.", generationLogFile);
-                    }
-                } catch (IOException e) {
-                    LOGGER.warn("Failed to create the generation log file. No generation details will be logged.");
-                }
-            }
-
             List<String> evoSuiteCommands = new ArrayList<>(baseCommands);
-            evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
+            evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft() + "_SiegeTest");
             evoSuiteCommands.add("-DsiegeTargetClass=" + vulnerability.getRight().getVulnerableClass());
             evoSuiteCommands.add("-DsiegeTargetMethod=" + vulnerability.getRight().getVulnerableMethod());
-            evoSuiteCommands.add("-DsiegeLogFile=" + (generationLogFile != null ? generationLogFile : ""));
             // TODO Before looping, should do a pre-analysis to filter out classes that do not statically reach any target, and sort them by probability
             for (String className : classNames) {
                 LOGGER.info("Starting the generation from class: {}", className);
+                // Create the generation logging file for this run
+                File generationLogFile = null;
+                if (generationLogDir != null && generationLogDir.exists()) {
+                    generationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", className.substring(className.lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
+                    try {
+                        if (generationLogFile.createNewFile()) {
+                            LOGGER.info("Generation log file {} successfully created. Going to write the generation log there.", generationLogFile);
+                        }
+                    } catch (IOException e) {
+                        LOGGER.warn("Failed to create the generation log file. No generation log will be written for this run.");
+                    }
+                }
+                evoSuiteCommands.add("-DsiegeLogFile=" + (generationLogFile != null ? generationLogFile : ""));
                 evoSuiteCommands.add("-class");
                 evoSuiteCommands.add(className);
                 List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
