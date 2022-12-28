@@ -1,5 +1,6 @@
 package it.unisa.siege.core;
 
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -33,6 +34,7 @@ import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class SiegeRunner {
     public static final String STATUS_UNREACHABLE = "UNREACHABLE";
@@ -131,7 +133,7 @@ public class SiegeRunner {
         LOGGER.info("Going to generate tests targeting {} vulnerabilities from {} classes.", targetVulnerabilities.size(), classNames.size());
         LOGGER.debug("Vulnerabilities: {}", targetVulnerabilities);
         LOGGER.debug("Client classes: {}", classNames);
-        List<Map<String, String>> results = new ArrayList<>();
+        List<Map<String, String>> allResults = new ArrayList<>();
         for (int i = 0; i < targetVulnerabilities.size(); i++) {
             Pair<String, VulnerabilityDescription> vulnerability = targetVulnerabilities.get(i);
             LOGGER.info("({}/{}) Going to generate tests to reach: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
@@ -140,7 +142,7 @@ public class SiegeRunner {
             evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
             evoSuiteCommands.add("-DsiegeTargetClass=" + vulnerability.getRight().getVulnerableClass());
             evoSuiteCommands.add("-DsiegeTargetMethod=" + vulnerability.getRight().getVulnerableMethod());
-            // TODO Before looping, should do a pre-analysis to filter out classes that do not statically reach any target, and sort them by probability
+            // TODO Before looping, should do a pre-analysis to filter out classes that do not statically reach any target, and sort them by a measure of probability to prioritize
             for (String className : classNames) {
                 LOGGER.info("Starting the generation from class: {}", className);
                 // Create the generation logging file for this run
@@ -168,80 +170,22 @@ public class SiegeRunner {
                     LOGGER.error(ExceptionUtils.getStackTrace(e));
                     continue;
                 }
-                // TODO Post-processing: remove empty test files in OUTPUT_DIR (i.e., the files having "public void notGeneratedAnyTest()" as the only method and its scaffolding) -> Enable an option to keepEmptyTests and an option to select the outDir (just like logDir)
-                LOGGER.info("Results for {}", vulnerability.getLeft());
-                if (evoSuiteResults.size() > 0) {
-                    for (List<TestGenerationResult<TestChromosome>> testResults : evoSuiteResults) {
-                        for (TestGenerationResult<TestChromosome> clientClassResult : testResults) {
-                            Map<String, String> result = new LinkedHashMap<>();
-                            GeneticAlgorithm<TestChromosome> algorithm = clientClassResult.getGeneticAlgorithm();
-                            String clientClassUnderTest = clientClassResult.getClassUnderTest();
-                            result.put("cve", vulnerability.getLeft());
-                            result.put("clientClass", clientClassUnderTest);
-                            Map<String, TestCase> wroteTests = clientClassResult.getTestCases();
-                            if (wroteTests.size() == 0) {
-                                result.putAll(createUnreachableResult());
-                                results.add(result);
-                                LOGGER.info("|-> Could not be reached from class '{}'", clientClassUnderTest);
-                                continue;
-                            }
+                // TODO Call this if -keepEmptyTests is not set. Also add a new option to select the -outDir (just like -logDir)
+                deleteEmptyTestFiles();
 
-                            // Since EvoSuite does not properly handle the getCurrentValue() method in MaxTimeStoppingCondition, I use an ad hoc method.
-                            // For the same reason, isFinished() is unreliable: we have to use spentBudget <= SEARCH_BUDGET
-                            long spentBudget = 0;
-                            long totalBudget = Properties.SEARCH_BUDGET;
-                            for (StoppingCondition<TestChromosome> stoppingCondition : algorithm.getStoppingConditions()) {
-                                if (stoppingCondition instanceof MaxTimeStoppingCondition) {
-                                    MaxTimeStoppingCondition<TestChromosome> timeStoppingCondition = (MaxTimeStoppingCondition<TestChromosome>) stoppingCondition;
-                                    spentBudget = timeStoppingCondition.getSpentBudget();
-                                    break;
-                                }
-                            }
-                            // Get the individuals covering any goal
-                            TestChromosome bestIndividual = getBestIndividual(algorithm);
-                            // Use ad hoc function because getFitness() offered by EvoSuite does not "fit" our needs
-                            double bestFitness = getBestFitness(bestIndividual);
-                            // Check if budget is not exhausted and at least one goal was covered
-                            if (spentBudget < totalBudget && bestFitness == 0) {
-                                result.put("status", STATUS_SUCCESS);
-                            } else {
-                                result.put("status", STATUS_FAILED);
-                            }
-                            long iterations = algorithm.getAge() + 1;
-
-                            result.put("entryPaths", String.valueOf(algorithm.getFitnessFunctions().size()));
-                            result.put("exploitedPaths", String.valueOf(wroteTests.size()));
-                            result.put("totalBudget", String.valueOf(totalBudget));
-                            result.put("spentBudget", String.valueOf(spentBudget));
-                            result.put("populationSize", String.valueOf(Properties.POPULATION));
-                            result.put("bestFitness", String.valueOf(bestFitness));
-                            result.put("iterations", String.valueOf(iterations));
-                            results.add(result);
-                            LOGGER.info("|-> Reached via {}/{} paths from class '{}'", result.get("exploitedPaths"), result.get("entryPaths"), result.get("clientClass"));
-                            LOGGER.info("|-> Using {}/{} seconds, within {} iterations.", result.get("spentBudget"), result.get("totalBudget"), result.get("iterations"));
-                        }
-                    }
-                } else {
-                    // TODO Probably this is now unneeded: to be removed. When this is removed, createUnreachableResult() can be inlined
-                    Map<String, String> result = new LinkedHashMap<>();
-                    result.put("cve", vulnerability.getLeft());
-                    result.put("status", STATUS_UNREACHABLE);
-                    results.add(result);
-                    LOGGER.info("--> Could not be reached from any client class");
-                }
+                addResults(allResults, evoSuiteResults, vulnerability.getLeft());
             }
         }
-
         // Export time
         Path outFilePath = runConfiguration.getOutFilePath();
         try {
             if (outFilePath != null) {
-                SiegeIO.writeToCsv(outFilePath, results);
+                SiegeIO.writeToCsv(outFilePath, allResults);
             }
         } catch (IOException e) {
             LOGGER.error("Failed to export the results on file {}. Printing on stdout instead.", outFilePath);
             LOGGER.error("\t* {}", ExceptionUtils.getStackTrace(e));
-            LOGGER.info(String.valueOf(results));
+            LOGGER.info(String.valueOf(allResults));
         }
     }
 
@@ -296,21 +240,68 @@ public class SiegeRunner {
         return classNames;
     }
 
-    /*
-    private static String buildProjectClasspath(String target, String librariesPath) {
-        StringBuilder jarsPaths = new StringBuilder();
-        File jarsDir = new File(librariesPath);
-        if (jarsDir.isDirectory()) {
-            for (File file : jarsDir.listFiles()) {
-                if (file.isFile() && file.getName().contains(".jar")) {
-                    jarsPaths.append(":");
-                    jarsPaths.append(file.getAbsolutePath());
+    private void addResults(List<Map<String, String>> allResults, List<List<TestGenerationResult<TestChromosome>>> resultsToAdd, String cve) {
+        LOGGER.info("Results for {}", cve);
+        if (resultsToAdd.size() > 0) {
+            for (List<TestGenerationResult<TestChromosome>> testResults : resultsToAdd) {
+                for (TestGenerationResult<TestChromosome> clientClassResult : testResults) {
+                    Map<String, String> result = new LinkedHashMap<>();
+                    GeneticAlgorithm<TestChromosome> algorithm = clientClassResult.getGeneticAlgorithm();
+                    String clientClassUnderTest = clientClassResult.getClassUnderTest();
+                    result.put("cve", cve);
+                    result.put("clientClass", clientClassUnderTest);
+                    Map<String, TestCase> wroteTests = clientClassResult.getTestCases();
+                    if (wroteTests.size() == 0) {
+                        result.putAll(createUnreachableResult());
+                        allResults.add(result);
+                        LOGGER.info("|-> Could not be reached from class '{}'", clientClassUnderTest);
+                        continue;
+                    }
+
+                    // Since EvoSuite does not properly handle the getCurrentValue() method in MaxTimeStoppingCondition, I use an ad hoc method.
+                    // For the same reason, isFinished() is unreliable: we have to use spentBudget <= SEARCH_BUDGET
+                    long spentBudget = 0;
+                    long totalBudget = Properties.SEARCH_BUDGET;
+                    for (StoppingCondition<TestChromosome> stoppingCondition : algorithm.getStoppingConditions()) {
+                        if (stoppingCondition instanceof MaxTimeStoppingCondition) {
+                            MaxTimeStoppingCondition<TestChromosome> timeStoppingCondition = (MaxTimeStoppingCondition<TestChromosome>) stoppingCondition;
+                            spentBudget = timeStoppingCondition.getSpentBudget();
+                            break;
+                        }
+                    }
+                    // Get the individuals covering any goal
+                    TestChromosome bestIndividual = getBestIndividual(algorithm);
+                    // Use ad hoc function because getFitness() offered by EvoSuite does not "fit" our needs
+                    double bestFitness = getBestFitness(bestIndividual);
+                    // Check if budget is not exhausted and at least one goal was covered
+                    if (spentBudget < totalBudget && bestFitness == 0) {
+                        result.put("status", STATUS_SUCCESS);
+                    } else {
+                        result.put("status", STATUS_FAILED);
+                    }
+                    long iterations = algorithm.getAge() + 1;
+
+                    result.put("entryPaths", String.valueOf(algorithm.getFitnessFunctions().size()));
+                    result.put("exploitedPaths", String.valueOf(wroteTests.size()));
+                    result.put("totalBudget", String.valueOf(totalBudget));
+                    result.put("spentBudget", String.valueOf(spentBudget));
+                    result.put("populationSize", String.valueOf(Properties.POPULATION));
+                    result.put("bestFitness", String.valueOf(bestFitness));
+                    result.put("iterations", String.valueOf(iterations));
+                    allResults.add(result);
+                    LOGGER.info("|-> Reached via {}/{} paths from class '{}'", result.get("exploitedPaths"), result.get("entryPaths"), result.get("clientClass"));
+                    LOGGER.info("|-> Using {}/{} seconds, within {} iterations.", result.get("spentBudget"), result.get("totalBudget"), result.get("iterations"));
                 }
             }
+        } else {
+            // TODO Probably this is now unneeded: to be removed. When this is removed, createUnreachableResult() can be inlined
+            Map<String, String> result = new LinkedHashMap<>();
+            result.put("cve", cve);
+            result.put("status", STATUS_UNREACHABLE);
+            allResults.add(result);
+            LOGGER.info("--> Could not be reached from any client class");
         }
-        return target + jarsPaths;
     }
-     */
 
     private Map<String, String> createUnreachableResult() {
         Map<String, String> result = new LinkedHashMap<>();
@@ -351,6 +342,33 @@ public class SiegeRunner {
 
     private double getBestFitness(TestChromosome individual) {
         return Collections.min(individual.getFitnessValues().values());
+    }
+
+    private void deleteEmptyTestFiles() throws IOException {
+        List<Path> outputFiles;
+        try (Stream<Path> stream = Files.walk(Paths.get(OUTPUT_DIR))) {
+            outputFiles = stream.filter(Files::isRegularFile)
+                    .filter(f -> FilenameUtils.getExtension(String.valueOf(f)).equals("java")).collect(Collectors.toList());
+        }
+        List<Path> emptyTestFiles = outputFiles.stream()
+                .filter(f -> !f.getFileName().toString().contains("scaffolding"))
+                .filter(SiegeIO::isTestFileEmpty)
+                .collect(Collectors.toList());
+        List<Path> filesToDelete = new ArrayList<>();
+        for (Path emptyTestFilePath : emptyTestFiles) {
+            filesToDelete.add(emptyTestFilePath);
+            String testFileName = emptyTestFilePath.toString();
+            String testFileBaseName = testFileName.substring(0, testFileName.lastIndexOf("."));
+            String scaffoldingFileName = testFileBaseName + "_scaffolding.java";
+            Path scaffoldingFilePath = Paths.get(scaffoldingFileName);
+            if (outputFiles.contains(scaffoldingFilePath)) {
+                filesToDelete.add(scaffoldingFilePath);
+            }
+        }
+        System.out.println(filesToDelete);
+        for (Path path : filesToDelete) {
+            path.toFile().delete();
+        }
     }
 
 }

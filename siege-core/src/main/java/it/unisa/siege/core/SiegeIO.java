@@ -3,11 +3,13 @@ package it.unisa.siege.core;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
 import com.opencsv.exceptions.CsvValidationException;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.evosuite.coverage.vulnerability.VulnerabilityDescription;
 
 import java.io.*;
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -54,6 +56,15 @@ public class SiegeIO {
             }
         } catch (FileNotFoundException e) {
             throw new IOException("Could not write to " + fullFilename + ".");
+        }
+    }
+
+    public static boolean isTestFileEmpty(Path testFilePath) {
+        try {
+            String content = FileUtils.readFileToString(testFilePath.toFile(), Charset.defaultCharset());
+            return content.contains("public void notGeneratedAnyTest()");
+        } catch (IOException e) {
+            return true;
         }
     }
 }
