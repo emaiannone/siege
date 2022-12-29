@@ -4,7 +4,7 @@ import it.unisa.siege.core.RunConfiguration;
 import it.unisa.siege.core.SiegeIO;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.tuple.Pair;
-import org.evosuite.coverage.vulnerability.VulnerabilityDescription;
+import org.evosuite.coverage.reachability.ReachabilityTarget;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -44,7 +44,7 @@ public class CLIArgumentParser {
 
         // Get the target vulnerability(ies)
         String vulnerabilitiesFilePath = commandLine.getOptionValue(CLIOptions.VULNERABILITIES_OPT);
-        List<Pair<String, VulnerabilityDescription>> vulnerabilityList;
+        List<Pair<String, ReachabilityTarget>> vulnerabilityList;
         try {
             vulnerabilityList = new ArrayList<>(SiegeIO.readAndParseCsv(Paths.get(vulnerabilitiesFilePath)));
         } catch (IOException e) {

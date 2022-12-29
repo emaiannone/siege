@@ -12,7 +12,7 @@ import org.evosuite.EvoSuite;
 import org.evosuite.Properties;
 import org.evosuite.TestGenerationContext;
 import org.evosuite.classpath.ResourceList;
-import org.evosuite.coverage.vulnerability.VulnerabilityDescription;
+import org.evosuite.coverage.reachability.ReachabilityTarget;
 import org.evosuite.ga.FitnessFunction;
 import org.evosuite.ga.metaheuristics.GeneticAlgorithm;
 import org.evosuite.ga.stoppingconditions.MaxTimeStoppingCondition;
@@ -55,7 +55,7 @@ public class SiegeRunner {
         LOGGER.info("Going to write tests in directory {}.", runConfiguration.getTestsDirPath().toFile().getCanonicalPath());
         List<String> baseCommands = new ArrayList<>(Arrays.asList(
                 "-generateTests",
-                "-criterion", Properties.Criterion.VULNERABILITY.name(),
+                "-criterion", Properties.Criterion.REACHABILITY.name(),
                 "-Dalgorithm=" + Properties.Algorithm.STEADY_STATE_GA.name(),
                 "-Dsearch_budget=" + runConfiguration.getBudget(),
                 "-Dpopulation=" + runConfiguration.getPopulationSize(),
@@ -130,19 +130,19 @@ public class SiegeRunner {
             }
         }
 
-        List<Pair<String, VulnerabilityDescription>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
+        List<Pair<String, ReachabilityTarget>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
         LOGGER.info("Going to generate tests targeting {} vulnerabilities from {} classes.", targetVulnerabilities.size(), classNames.size());
         LOGGER.debug("Vulnerabilities: {}", targetVulnerabilities);
         LOGGER.debug("Client classes: {}", classNames);
         List<Map<String, String>> allResults = new ArrayList<>();
         for (int i = 0; i < targetVulnerabilities.size(); i++) {
-            Pair<String, VulnerabilityDescription> vulnerability = targetVulnerabilities.get(i);
+            Pair<String, ReachabilityTarget> vulnerability = targetVulnerabilities.get(i);
             LOGGER.info("({}/{}) Generating tests for: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
             List<String> evoSuiteCommands = new ArrayList<>(baseCommands);
             // NOTE Must replace hyphens with underscores to avoid errors while compiling the tests
             evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
-            evoSuiteCommands.add("-DsiegeTargetClass=" + vulnerability.getRight().getVulnerableClass());
-            evoSuiteCommands.add("-DsiegeTargetMethod=" + vulnerability.getRight().getVulnerableMethod());
+            evoSuiteCommands.add("-DsiegeTargetClass=" + vulnerability.getRight().getTargetClass());
+            evoSuiteCommands.add("-DsiegeTargetMethod=" + vulnerability.getRight().getTargetMethod());
             // TODO Before looping, should do a pre-analysis to filter out classes that do not statically reach any target, and sort them by a measure of probability to prioritize
             for (String className : classNames) {
                 LOGGER.info("Starting from class: {}", className);
@@ -366,7 +366,6 @@ public class SiegeRunner {
                 filesToDelete.add(scaffoldingFilePath);
             }
         }
-        System.out.println(filesToDelete);
         for (Path path : filesToDelete) {
             path.toFile().delete();
         }

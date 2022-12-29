@@ -1,7 +1,7 @@
 package it.unisa.siege.core;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.evosuite.coverage.vulnerability.VulnerabilityDescription;
+import org.evosuite.coverage.reachability.ReachabilityTarget;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -10,14 +10,14 @@ public class RunConfiguration {
     private final Path project;
     private final String classpath;
     private final String clientClass;
-    private final List<Pair<String, VulnerabilityDescription>> targetVulnerabilities;
+    private final List<Pair<String, ReachabilityTarget>> targetVulnerabilities;
     private final int budget;
     private final int populationSize;
     private final Path testsDirPath;
     private final Path outFilePath;
     private final Path logDirPath;
 
-    public RunConfiguration(Path project, String classpath, String clientClass, List<Pair<String, VulnerabilityDescription>> targetVulnerabilities, int budget, int populationSize, Path testsDirPath, Path outFilePath, Path logDirPath) {
+    public RunConfiguration(Path project, String classpath, String clientClass, List<Pair<String, ReachabilityTarget>> targetVulnerabilities, int budget, int populationSize, Path testsDirPath, Path outFilePath, Path logDirPath) {
         this.project = project;
         this.classpath = classpath;
         this.clientClass = clientClass;
@@ -41,7 +41,7 @@ public class RunConfiguration {
         return clientClass;
     }
 
-    public List<Pair<String, VulnerabilityDescription>> getTargetVulnerabilities() {
+    public List<Pair<String, ReachabilityTarget>> getTargetVulnerabilities() {
         return targetVulnerabilities;
     }
 

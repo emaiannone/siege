@@ -6,7 +6,7 @@ import com.opencsv.exceptions.CsvValidationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.evosuite.coverage.vulnerability.VulnerabilityDescription;
+import org.evosuite.coverage.reachability.ReachabilityTarget;
 
 import java.io.*;
 import java.nio.charset.Charset;
@@ -18,12 +18,12 @@ import java.util.Map;
 import java.util.Set;
 
 public class SiegeIO {
-    public static List<Pair<String, VulnerabilityDescription>> readAndParseCsv(Path csvFilePath) throws IOException {
-        List<Pair<String, VulnerabilityDescription>> vulnerabilityList = new ArrayList<>();
+    public static List<Pair<String, ReachabilityTarget>> readAndParseCsv(Path csvFilePath) throws IOException {
+        List<Pair<String, ReachabilityTarget>> vulnerabilityList = new ArrayList<>();
         try (CSVReader reader = new CSVReaderBuilder(new FileReader(csvFilePath.toFile())).withSkipLines(1).build()) {
             String[] values;
             while ((values = reader.readNext()) != null) {
-                vulnerabilityList.add(new ImmutablePair<>(values[0], new VulnerabilityDescription(values[2], values[3])));
+                vulnerabilityList.add(new ImmutablePair<>(values[0], new ReachabilityTarget(values[2], values[3])));
             }
         } catch (CsvValidationException e) {
             throw new IOException(e);
