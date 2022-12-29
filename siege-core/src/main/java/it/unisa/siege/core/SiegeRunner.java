@@ -56,6 +56,7 @@ public class SiegeRunner {
         List<String> baseCommands = new ArrayList<>(Arrays.asList(
                 "-generateTests",
                 "-criterion", Properties.Criterion.REACHABILITY.name(),
+                "-Dbranch_awareness=true",
                 "-Dalgorithm=" + Properties.Algorithm.STEADY_STATE_GA.name(),
                 "-Dsearch_budget=" + runConfiguration.getBudget(),
                 "-Dpopulation=" + runConfiguration.getPopulationSize(),
