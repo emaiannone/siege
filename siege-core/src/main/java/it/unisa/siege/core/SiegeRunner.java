@@ -139,14 +139,15 @@ public class SiegeRunner {
         for (int i = 0; i < targetVulnerabilities.size(); i++) {
             Pair<String, ReachabilityTarget> vulnerability = targetVulnerabilities.get(i);
             LOGGER.info("({}/{}) Generating tests for: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
-            List<String> evoSuiteCommands = new ArrayList<>(baseCommands);
+            List<String> baseCommands2 = new ArrayList<>(baseCommands);
             // NOTE Must replace hyphens with underscores to avoid errors while compiling the tests
-            evoSuiteCommands.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
-            evoSuiteCommands.add("-DsiegeTargetClass=" + vulnerability.getRight().getTargetClass());
-            evoSuiteCommands.add("-DsiegeTargetMethod=" + vulnerability.getRight().getTargetMethod());
+            baseCommands2.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
+            baseCommands2.add("-Dsiege_target_class=" + vulnerability.getRight().getTargetClass());
+            baseCommands2.add("-Dsiege_target_method=" + vulnerability.getRight().getTargetMethod());
             // TODO Before looping, should do a pre-analysis to filter out classes that do not statically reach any target, and sort them by a measure of probability to prioritize
             for (String className : classNames) {
                 LOGGER.info("Starting from class: {}", className);
+                // TODO Set ES target class
                 // Create the generation logging file for this run
                 File generationLogFile = null;
                 if (generationLogDir != null && generationLogDir.exists()) {
@@ -159,7 +160,8 @@ public class SiegeRunner {
                         LOGGER.warn("Failed to create the generation log file. No generation log will be written for this run.");
                     }
                 }
-                evoSuiteCommands.add("-DsiegeLogFile=" + (generationLogFile != null ? generationLogFile : ""));
+                List<String> evoSuiteCommands = new ArrayList<>(baseCommands2);
+                evoSuiteCommands.add("-Dsiege_log_file=" + (generationLogFile != null ? generationLogFile : ""));
                 evoSuiteCommands.add("-class");
                 evoSuiteCommands.add(className);
                 List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
