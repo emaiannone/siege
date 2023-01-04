@@ -81,8 +81,9 @@ public class CLIArgumentParser {
             }
         }
 
-        String testsDirArg = commandLine.getOptionValue(CLIOptions.TESTS_DIR_OPT);
-        Path testsDirPath = Paths.get(testsDirArg != null ? testsDirArg : CLIOptions.TESTS_DIR_DEFAULT);
+        String baseTestsDirArg = commandLine.getOptionValue(CLIOptions.TESTS_DIR_OPT);
+        Path baseTestsDirPath = Paths.get(baseTestsDirArg != null ? baseTestsDirArg : CLIOptions.TESTS_DIR_DEFAULT);
+        Path testsDirPath = Paths.get(baseTestsDirPath.toString(), projectPath.getFileName().toString());
 
         String outFileArg = commandLine.getOptionValue(CLIOptions.OUT_FILE_OPT);
         Path outFilePath = outFileArg != null ? Paths.get(outFileArg) : null;

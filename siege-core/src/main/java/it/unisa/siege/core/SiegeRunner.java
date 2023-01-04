@@ -65,6 +65,8 @@ public class SiegeRunner {
                 "-Dinstrument_method_calls=true",
                 "-Dinstrument_libraries=true",
                 "-Dassertions=false",
+                //"-Dcarve_object_pool=true",
+                //"-Dchop_carved_exceptions=false",
                 "-Dminimize=true",
                 "-Dserialize_ga=true",
                 "-Dserialize_result=true",
