@@ -1,5 +1,6 @@
 package it.unisa.siege.core;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -11,8 +12,10 @@ import org.apache.maven.shared.invoker.MavenInvocationException;
 import org.evosuite.EvoSuite;
 import org.evosuite.Properties;
 import org.evosuite.TestGenerationContext;
+import org.evosuite.analysis.StoredStaticPaths;
 import org.evosuite.classpath.ResourceList;
 import org.evosuite.coverage.reachability.ReachabilityTarget;
+import org.evosuite.coverage.reachability.StaticPath;
 import org.evosuite.ga.FitnessFunction;
 import org.evosuite.ga.metaheuristics.GeneticAlgorithm;
 import org.evosuite.ga.stoppingconditions.MaxTimeStoppingCondition;
@@ -48,6 +51,12 @@ public class SiegeRunner {
     }
 
     public void run() throws MavenInvocationException, IOException {
+        List<Pair<String, ReachabilityTarget>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
+        if (targetVulnerabilities.isEmpty()) {
+            LOGGER.warn("No vulnerabilities to reach. No generation can be done.");
+            return;
+        }
+
         // Instantiate EvoSuite now just to update the logging context
         EvoSuite evoSuite = new EvoSuite();
         LOGGER.info("Going to use {} seconds budget.", runConfiguration.getBudget());
@@ -89,7 +98,6 @@ public class SiegeRunner {
             }
             LOGGER.info("The project's classpath was supplied via command-line argument. Going to use {}.", classpath);
         } else {
-            // TODO Might need an option that automatically compiles the project (with the supplied Maven executable) first if target/class does not exist yet
             projectDirectory = getMavenOutputDirectory(project);
             if (!Files.exists(Paths.get(projectDirectory))) {
                 throw new IllegalArgumentException("The target project must be compiled first.");
@@ -101,14 +109,18 @@ public class SiegeRunner {
         baseCommands.add("-projectCP");
         baseCommands.add(projectDirectory + ":" + classpath);
 
-        List<String> classNames = new ArrayList<>();
-        String clientClass = runConfiguration.getClientClass();
-        if (clientClass != null) {
-            classNames.add(clientClass);
+        List<String> allClientClasses = new ArrayList<>();
+        String specificClientClass = runConfiguration.getClientClass();
+        if (specificClientClass != null) {
+            allClientClasses.add(specificClientClass);
         } else {
-            classNames = getClassNames(projectDirectory, classpath);
+            allClientClasses = getClassNames(projectDirectory, classpath);
             // baseCommands.add("-target");
             // baseCommands.add(outputDirectory);
+        }
+        if (allClientClasses.isEmpty()) {
+            LOGGER.warn("No client classes was found. No generation can be done.");
+            return;
         }
 
         // Create the generation logging directory
@@ -133,10 +145,9 @@ public class SiegeRunner {
             }
         }
 
-        List<Pair<String, ReachabilityTarget>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
-        LOGGER.info("Going to generate tests targeting {} vulnerabilities from {} classes.", targetVulnerabilities.size(), classNames.size());
-        LOGGER.debug("Vulnerabilities: {}", targetVulnerabilities);
-        LOGGER.debug("Client classes: {}", classNames);
+        LOGGER.info("Try to generate tests targeting {} vulnerabilities from a pool of {} client classes.", targetVulnerabilities.size(), allClientClasses.size());
+        LOGGER.debug("Vulnerabilities ({}): {}", targetVulnerabilities.size(), targetVulnerabilities);
+        LOGGER.debug("Client classes ({}): {}", allClientClasses.size(), allClientClasses);
         List<Map<String, String>> allResults = new ArrayList<>();
         for (int i = 0; i < targetVulnerabilities.size(); i++) {
             Pair<String, ReachabilityTarget> vulnerability = targetVulnerabilities.get(i);
@@ -146,14 +157,39 @@ public class SiegeRunner {
             baseCommands2.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
             baseCommands2.add("-Dsiege_target_class=" + vulnerability.getRight().getTargetClass());
             baseCommands2.add("-Dsiege_target_method=" + vulnerability.getRight().getTargetMethod());
-            // TODO Before looping, should do a pre-analysis to filter out classes that do not statically reach any target, and sort them by a measure of probability to prioritize
-            for (String className : classNames) {
-                LOGGER.info("Starting from class: {}", className);
-                // TODO Set ES target class
+
+            LOGGER.info("Doing a fake EvoSuite run to collect static paths to target {}", vulnerability.getRight());
+            List<String> fakeEvoSuiteCommands = new ArrayList<>(baseCommands2);
+            fakeEvoSuiteCommands.add("-class");
+            fakeEvoSuiteCommands.add(allClientClasses.get(0));
+            evoSuite.parseCommandLine(fakeEvoSuiteCommands.toArray(new String[0]));
+            FileUtils.deleteDirectory(runConfiguration.getTestsDirPath().toFile());
+            // NOTE If keeping the Map in StoredStaticPaths does not scale, just store the static paths for the current reachability target
+            Set<StaticPath> staticPaths = StoredStaticPaths.getStaticPathsToTarget(vulnerability.getRight().getTargetClass(), vulnerability.getRight().getTargetMethod());
+            LOGGER.info("Found {} static paths that could reach the target {}.", staticPaths.size(), vulnerability.getRight());
+            LOGGER.debug("Static paths to target: {}", staticPaths);
+            if (staticPaths.isEmpty()) {
+                LOGGER.warn("No client classes seem to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
+                continue;
+            }
+            // FIXME Try to check the entire path, not only the rootnode. Plus, sometimes goal are not created... why?
+            List<String> candidateClientClasses = allClientClasses.stream()
+                    .filter(c -> staticPaths.stream().anyMatch(sp -> sp.getRootNode().getClassName().equals(c)))
+                    .collect(Collectors.toList());
+            if (candidateClientClasses.isEmpty()) {
+                LOGGER.warn("No client classes seems to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
+                continue;
+            }
+            LOGGER.info("{} client classes seem to reach vulnerability {}.", candidateClientClasses.size(), vulnerability.getLeft());
+            LOGGER.debug("Candidate client classes ({}): {}", candidateClientClasses.size(), candidateClientClasses);
+
+            // TODO Prioritize the candidate client classes using a measure of probability of exploitation
+            for (String candidateClientClass : candidateClientClasses) {
+                LOGGER.info("Starting the test generation from client class: {}", candidateClientClass);
                 // Create the generation logging file for this run
                 File generationLogFile = null;
                 if (generationLogDir != null && generationLogDir.exists()) {
-                    generationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", className.substring(className.lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
+                    generationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", candidateClientClass.substring(candidateClientClass.lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
                     try {
                         if (generationLogFile.createNewFile()) {
                             LOGGER.info("Going to write the generation log in file {}.", generationLogFile);
@@ -165,7 +201,7 @@ public class SiegeRunner {
                 List<String> evoSuiteCommands = new ArrayList<>(baseCommands2);
                 evoSuiteCommands.add("-Dsiege_log_file=" + (generationLogFile != null ? generationLogFile : ""));
                 evoSuiteCommands.add("-class");
-                evoSuiteCommands.add(className);
+                evoSuiteCommands.add(candidateClientClass);
                 List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
                 try {
                     evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
@@ -257,7 +293,7 @@ public class SiegeRunner {
                     result.put("cve", cve);
                     result.put("clientClass", clientClassUnderTest);
                     Map<String, TestCase> wroteTests = clientClassResult.getTestCases();
-                    if (wroteTests.size() == 0) {
+                    if (wroteTests.isEmpty()) {
                         result.putAll(createUnreachableResult());
                         allResults.add(result);
                         LOGGER.info("|-> Could not be reached from class '{}'", clientClassUnderTest);
