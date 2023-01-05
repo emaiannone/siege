@@ -8,7 +8,7 @@ import java.util.List;
 
 public class RunConfiguration {
     private final Path project;
-    private final String classpath;
+    private final Path classpathFilePath;
     private final String clientClass;
     private final List<Pair<String, ReachabilityTarget>> targetVulnerabilities;
     private final int budget;
@@ -17,9 +17,9 @@ public class RunConfiguration {
     private final Path outFilePath;
     private final Path logDirPath;
 
-    public RunConfiguration(Path project, String classpath, String clientClass, List<Pair<String, ReachabilityTarget>> targetVulnerabilities, int budget, int populationSize, Path testsDirPath, Path outFilePath, Path logDirPath) {
+    public RunConfiguration(Path project, Path classpathFilePath, String clientClass, List<Pair<String, ReachabilityTarget>> targetVulnerabilities, int budget, int populationSize, Path testsDirPath, Path outFilePath, Path logDirPath) {
         this.project = project;
-        this.classpath = classpath;
+        this.classpathFilePath = classpathFilePath;
         this.clientClass = clientClass;
         this.targetVulnerabilities = targetVulnerabilities;
         this.budget = budget;
@@ -33,8 +33,8 @@ public class RunConfiguration {
         return project;
     }
 
-    public String getClasspath() {
-        return classpath;
+    public Path getClasspathFilePath() {
+        return classpathFilePath;
     }
 
     public String getClientClass() {

@@ -5,7 +5,7 @@ import org.apache.commons.cli.Options;
 
 public class CLIOptions extends Options {
     public static final String PROJECT_OPT = "project";
-    public static final String CLASSPATH_OPT = "classpath";
+    public static final String CLASSPATH_FILE_OPT = "classpath";
     public static final String CLIENT_CLASS_OPT = "clientClass";
     public static final String VULNERABILITIES_OPT = "vulnerabilities";
     public static final String BUDGET_OPT = "budget";
@@ -25,9 +25,9 @@ public class CLIOptions extends Options {
                 .desc("Path to the project to inspect. If the path points to the root of a Maven-based project (i.e., where a pom.xml file is located), the inspected classes will be taken from the default output directory (e.g., target/classes) using the locally-installed Maven (hence, the project must be compiled beforehand). Alternatively, the path can also point to a directory with .class files to inspect.")
                 .build();
 
-        Option classpathOpt = Option.builder(CLASSPATH_OPT)
+        Option classpathFileOpt = Option.builder(CLASSPATH_FILE_OPT)
                 .hasArg(true)
-                .desc(String.format("Classpath string to use if the supplied project directory (via option -%s) was not a Maven-based project (this option is ignore in that case).", PROJECT_OPT))
+                .desc("Text file  containing the full classpath of the project to inspect. The classpath can be obtained by running certain Maven goals, such as `mvn -q exec:exec -Dexec.executable=echo -Dexec.args=\"%classpath\"` or `mvn dependency:build-classpath`.")
                 .build();
 
         Option clientClassOpt = Option.builder(CLIENT_CLASS_OPT)
@@ -71,7 +71,7 @@ public class CLIOptions extends Options {
                 .build();
 
         addOption(projectOpt);
-        addOption(classpathOpt);
+        addOption(classpathFileOpt);
         addOption(clientClassOpt);
         addOption(vulnerabilitiesOpt);
         addOption(budgetOpt);

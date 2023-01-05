@@ -39,7 +39,15 @@ public class CLIArgumentParser {
             throw new IOException("The supplied project path must point to an existing directory.");
         }
 
-        String classpath = commandLine.getOptionValue(CLIOptions.CLASSPATH_OPT);
+        String classpathFile = commandLine.getOptionValue(CLIOptions.CLASSPATH_FILE_OPT);
+        if (classpathFile == null) {
+            throw new IOException("The project's classpath file was not specified.");
+        }
+        Path classpathFilePath = Paths.get(classpathFile);
+        if (!Files.exists(classpathFilePath)) {
+            throw new IOException("The supplied classpath file must point to an existing file.");
+        }
+
         String clientClass = commandLine.getOptionValue(CLIOptions.CLIENT_CLASS_OPT);
 
         // Get the target vulnerability(ies)
@@ -91,6 +99,6 @@ public class CLIArgumentParser {
         String logDirArg = commandLine.getOptionValue(CLIOptions.LOG_DIR_OPT);
         Path logDirPath = logDirArg != null ? Paths.get(logDirArg) : null;
 
-        return new RunConfiguration(projectPath, classpath, clientClass, vulnerabilityList, budget, popSize, testsDirPath, outFilePath, logDirPath);
+        return new RunConfiguration(projectPath, classpathFilePath, clientClass, vulnerabilityList, budget, popSize, testsDirPath, outFilePath, logDirPath);
     }
 }
