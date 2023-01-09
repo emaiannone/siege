@@ -55,7 +55,7 @@ public class SiegeRunner {
         this.runConfiguration = runConfiguration;
     }
 
-    public void run() throws MavenInvocationException, IOException {
+    public void run() throws IOException {
         List<Pair<String, ReachabilityTarget>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
         if (targetVulnerabilities.isEmpty()) {
             LOGGER.warn("No vulnerabilities to reach. No generation can be done.");
@@ -190,26 +190,29 @@ public class SiegeRunner {
                 }
             }
             fakeEvoSuiteCommands.add("-Dsiege_log_file=" + (fakeGenerationLogFile != null ? fakeGenerationLogFile : ""));
-            // TODO findStaticPathsToNode() goes on infinite loop, again...
+
             evoSuite.parseCommandLine(fakeEvoSuiteCommands.toArray(new String[0]));
             FileUtils.deleteDirectory(runConfiguration.getTestsDirPath().toFile());
             // NOTE If keeping the Map in StoredStaticPaths does not scale, just store the static paths for the current reachability target
             Set<StaticPath> staticPaths = StoredStaticPaths.getStaticPathsToTarget(vulnerability.getRight().getTargetClass(), vulnerability.getRight().getTargetMethod());
             LOGGER.info("Found {} static paths that could reach the target {}.", staticPaths.size(), vulnerability.getRight());
-            LOGGER.debug("Static paths to target: {}", staticPaths);
+            LOGGER.debug("Static paths to target ({}): {}", staticPaths.size(), staticPaths);
             if (staticPaths.isEmpty()) {
                 LOGGER.warn("No client classes seem to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
                 continue;
             }
-            // FIXME Try to check the entire path, not only the rootnode.
-            List<String> candidateClientClasses = allClientClasses.stream()
-                    .filter(c -> staticPaths.stream().anyMatch(sp -> sp.getRootNode().getClassName().equals(c)))
-                    .collect(Collectors.toList());
+            // TODO Give higher priority to the classes in the root
+            List<String> candidateClientClasses = new ArrayList<>();
+            for (String clientClass : allClientClasses) {
+                if (staticPaths.stream().anyMatch(staticPath -> staticPath.getCalledClasses().contains(clientClass))) {
+                    candidateClientClasses.add(clientClass);
+                }
+            }
             if (candidateClientClasses.isEmpty()) {
                 LOGGER.warn("No client classes seems to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
                 continue;
             }
-            LOGGER.info("{} client classes seem to reach vulnerability {}.", candidateClientClasses.size(), vulnerability.getLeft());
+            LOGGER.info("{} client classes statically reach the vulnerability {}.", candidateClientClasses.size(), vulnerability.getLeft());
             LOGGER.debug("Candidate client classes ({}): {}", candidateClientClasses.size(), candidateClientClasses);
 
             // TODO Prioritize the candidate client classes using a measure of probability of exploitation
