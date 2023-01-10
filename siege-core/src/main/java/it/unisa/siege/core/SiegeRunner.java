@@ -78,7 +78,7 @@ public class SiegeRunner {
                 "-Dinstrument_context=true",
                 "-Dinstrument_method_calls=true",
                 "-Dinstrument_libraries=true",
-                "-Dinstrument_target_callers=false",
+                "-Dinstrument_target_callers=false", // TODO Takes long time, to be tested again
                 "-Dassertions=false",
                 //"-Dcarve_object_pool=true",
                 //"-Dchop_carved_exceptions=false",
@@ -164,9 +164,9 @@ public class SiegeRunner {
         LOGGER.debug("Vulnerabilities ({}): {}", targetVulnerabilities.size(), targetVulnerabilities);
         LOGGER.debug("Client classes ({}): {}", allClientClasses.size(), allClientClasses);
         List<Map<String, String>> allResults = new ArrayList<>();
-        for (int i = 0; i < targetVulnerabilities.size(); i++) {
-            Pair<String, ReachabilityTarget> vulnerability = targetVulnerabilities.get(i);
-            LOGGER.info("({}/{}) Generating tests for: {}", i + 1, targetVulnerabilities.size(), vulnerability.getLeft());
+        for (int idx = 0; idx < targetVulnerabilities.size(); idx++) {
+            Pair<String, ReachabilityTarget> vulnerability = targetVulnerabilities.get(idx);
+            LOGGER.info("({}/{}) Generating tests for: {}", idx + 1, targetVulnerabilities.size(), vulnerability.getLeft());
             List<String> baseCommands2 = new ArrayList<>(baseCommands);
             // NOTE Must replace hyphens with underscores to avoid errors while compiling the tests
             baseCommands2.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
@@ -204,13 +204,10 @@ public class SiegeRunner {
                 LOGGER.warn("No client classes seem to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
                 continue;
             }
-            // TODO Give higher priority to the classes in the root. Use a different looping
-            List<String> candidateClientClasses = new ArrayList<>();
-            for (String clientClass : allClientClasses) {
-                if (staticPaths.stream().anyMatch(p -> p.getCalledClasses().contains(clientClass))) {
-                    candidateClientClasses.add(clientClass);
-                }
-            }
+
+            // This function gives higher priority to the classes near the root.
+            // TODO Prioritize the candidate client classes using a measure of probability of exploitation (heuristic-based)
+            List<String> candidateClientClasses = selectRelevantClasses(allClientClasses, staticPaths);
             if (candidateClientClasses.isEmpty()) {
                 LOGGER.warn("No client classes seems to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
                 continue;
@@ -218,7 +215,6 @@ public class SiegeRunner {
             LOGGER.info("{} client classes statically reach the vulnerability {}.", candidateClientClasses.size(), vulnerability.getLeft());
             LOGGER.debug("Candidate client classes ({}): {}", candidateClientClasses.size(), candidateClientClasses);
 
-            // TODO Prioritize the candidate client classes using a measure of probability of exploitation
             for (String candidateClientClass : candidateClientClasses) {
                 LOGGER.info("Starting the test generation from client class: {}", candidateClientClass);
                 // Create the generation logging file for this run
@@ -243,7 +239,7 @@ public class SiegeRunner {
                             evoSuite.parseCommandLine(evoSuiteCommands.toArray(new String[0]));
                 } catch (Exception e) {
                     // Log and go to next iteration
-                    LOGGER.warn("A problem occurred while generating exploits for {}. Skipping it.", vulnerability.getLeft());
+                    LOGGER.warn("A problem occurred while generating exploits with {}. Skipping it.", candidateClientClass);
                     LOGGER.error(ExceptionUtils.getStackTrace(e));
                     continue;
                 }
@@ -264,6 +260,33 @@ public class SiegeRunner {
             LOGGER.error("\t* {}", ExceptionUtils.getStackTrace(e));
             LOGGER.info(String.valueOf(allResults));
         }
+    }
+
+    private List<String> selectRelevantClasses(List<String> allClientClasses, Set<StaticPath> staticPaths) {
+        Set<String> candidateClientClasses = new LinkedHashSet<>();
+        // Sort classes by their proximity to the root of the paths
+        Set<StaticPath> relevantPaths = new LinkedHashSet<>();
+        for (StaticPath staticPath : staticPaths) {
+            Set<String> calledClasses = new LinkedHashSet<>(staticPath.getCalledClasses());
+            calledClasses.retainAll(allClientClasses);
+            if (!calledClasses.isEmpty()) {
+                relevantPaths.add(staticPath);
+            }
+        }
+        if (relevantPaths.isEmpty()) {
+            return new ArrayList<>();
+        }
+        int maxLength = relevantPaths.stream()
+                .mapToInt(p -> p.getCalledClasses().size())
+                .max().getAsInt();
+        for (int i = 0; i < maxLength; i++) {
+            for (StaticPath staticPath : relevantPaths) {
+                if (i < staticPath.length()) {
+                    candidateClientClasses.add(staticPath.get(i).getClassName());
+                }
+            }
+        }
+        return new ArrayList<>(candidateClientClasses);
     }
 
     private void callMaven(List<String> goals, Path directory) throws IOException, MavenInvocationException {
