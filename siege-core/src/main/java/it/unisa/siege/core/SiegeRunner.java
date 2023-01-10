@@ -178,6 +178,7 @@ public class SiegeRunner {
             fakeEvoSuiteCommands.add(allClientClasses.get(0));
 
             // DEBUG
+            /*
             File fakeGenerationLogFile = null;
             if (generationLogDir != null && generationLogDir.exists()) {
                 fakeGenerationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", allClientClasses.get(0).substring(allClientClasses.get(0).lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
@@ -190,6 +191,7 @@ public class SiegeRunner {
                 }
             }
             fakeEvoSuiteCommands.add("-Dsiege_log_file=" + (fakeGenerationLogFile != null ? fakeGenerationLogFile : ""));
+             */
 
             evoSuite.parseCommandLine(fakeEvoSuiteCommands.toArray(new String[0]));
             FileUtils.deleteDirectory(runConfiguration.getTestsDirPath().toFile());
@@ -201,10 +203,10 @@ public class SiegeRunner {
                 LOGGER.warn("No client classes seem to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
                 continue;
             }
-            // TODO Give higher priority to the classes in the root
+            // TODO Give higher priority to the classes in the root. Use a different looping
             List<String> candidateClientClasses = new ArrayList<>();
             for (String clientClass : allClientClasses) {
-                if (staticPaths.stream().anyMatch(staticPath -> staticPath.getCalledClasses().contains(clientClass))) {
+                if (staticPaths.stream().anyMatch(p -> p.getCalledClasses().contains(clientClass))) {
                     candidateClientClasses.add(clientClass);
                 }
             }
