@@ -7,9 +7,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 public class RunConfiguration {
-    private final Path project;
-    private final Path classpathFilePath;
-    private final String clientClass;
+    private final Path projectPath;
+    private final String classpathFileName;
     private final List<Pair<String, ReachabilityTarget>> targetVulnerabilities;
     private final int budget;
     private final int populationSize;
@@ -17,10 +16,9 @@ public class RunConfiguration {
     private final Path outFilePath;
     private final Path logDirPath;
 
-    public RunConfiguration(Path project, Path classpathFilePath, String clientClass, List<Pair<String, ReachabilityTarget>> targetVulnerabilities, int budget, int populationSize, Path testsDirPath, Path outFilePath, Path logDirPath) {
-        this.project = project;
-        this.classpathFilePath = classpathFilePath;
-        this.clientClass = clientClass;
+    public RunConfiguration(Path projectPath, String classpathFileName, List<Pair<String, ReachabilityTarget>> targetVulnerabilities, int budget, int populationSize, Path testsDirPath, Path outFilePath, Path logDirPath) {
+        this.projectPath = projectPath;
+        this.classpathFileName = classpathFileName;
         this.targetVulnerabilities = targetVulnerabilities;
         this.budget = budget;
         this.populationSize = populationSize;
@@ -29,16 +27,12 @@ public class RunConfiguration {
         this.logDirPath = logDirPath;
     }
 
-    public Path getProject() {
-        return project;
+    public Path getProjectPath() {
+        return projectPath;
     }
 
-    public Path getClasspathFilePath() {
-        return classpathFilePath;
-    }
-
-    public String getClientClass() {
-        return clientClass;
+    public String getClasspathFileName() {
+        return classpathFileName;
     }
 
     public List<Pair<String, ReachabilityTarget>> getTargetVulnerabilities() {

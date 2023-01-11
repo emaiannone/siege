@@ -1,23 +1,12 @@
 package it.unisa.siege.core;
 
-import me.tongfei.progressbar.ConsoleProgressBarConsumer;
-import me.tongfei.progressbar.ProgressBar;
-import me.tongfei.progressbar.ProgressBarBuilder;
-import me.tongfei.progressbar.ProgressBarStyle;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.maven.shared.invoker.DefaultInvocationRequest;
-import org.apache.maven.shared.invoker.DefaultInvoker;
-import org.apache.maven.shared.invoker.InvocationRequest;
-import org.apache.maven.shared.invoker.MavenInvocationException;
 import org.evosuite.EvoSuite;
 import org.evosuite.Properties;
-import org.evosuite.TestGenerationContext;
 import org.evosuite.analysis.StoredStaticPaths;
-import org.evosuite.classpath.ResourceList;
 import org.evosuite.coverage.reachability.ReachabilityTarget;
 import org.evosuite.coverage.reachability.StaticPath;
 import org.evosuite.ga.FitnessFunction;
@@ -30,13 +19,9 @@ import org.evosuite.testcase.TestChromosome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
@@ -63,10 +48,8 @@ public class SiegeRunner {
         }
 
         // Instantiate EvoSuite now just to update the logging context
-        EvoSuite evoSuite = new EvoSuite();
-        LOGGER.info("Using {} seconds budget.", runConfiguration.getBudget());
-        LOGGER.info("Evolving populations of {} individuals.", runConfiguration.getPopulationSize());
-        LOGGER.info("Writing tests in directory {}.", runConfiguration.getTestsDirPath().toFile().getCanonicalPath());
+        EvoSuite fakeEvoSuite = new EvoSuite();
+        LOGGER.info("Analyzing project: {}.", runConfiguration.getProjectPath());
         List<String> baseCommands = new ArrayList<>(Arrays.asList(
                 "-generateTests",
                 "-criterion", Properties.Criterion.REACHABILITY.name(),
@@ -107,36 +90,40 @@ public class SiegeRunner {
             LOGGER.debug("Project directories: {}", projectDirectories);
         }
          */
-        List<String> classpathElements;
-        String classpath;
-        try {
-            classpathElements = readClasspathFile(runConfiguration.getClasspathFilePath());
-            classpath = String.join(":", classpathElements);
-        } catch (IOException | InvalidPathException e) {
-            throw new IllegalArgumentException("The supplied project's classpath has some invalid paths.");
-        }
-        LOGGER.info("The project's classpath was read from file {}.", runConfiguration.getClasspathFilePath());
-        LOGGER.debug("Classpath: {}", classpath);
-        baseCommands.add("-projectCP");
-        baseCommands.add(classpath);
 
-        List<String> allClientClasses = new ArrayList<>();
-        String specificClientClass = runConfiguration.getClientClass();
-        if (specificClientClass != null) {
-            allClientClasses.add(specificClientClass);
-        } else {
-            List<String> projectDirectories = classpathElements.stream()
-                    .filter(ce -> Paths.get(ce).startsWith(runConfiguration.getProject()))
-                    .collect(Collectors.toList());
-            LOGGER.info("The project has {} directories with .class files.", projectDirectories.size());
-            LOGGER.debug("Project directories: {}", projectDirectories);
-            allClientClasses = findClassNames(projectDirectories, classpath);
-            // baseCommands.add("-target");
-            // baseCommands.add(outputDirectory);
+        LOGGER.info("Looking for classpath files named: {}.", runConfiguration.getClasspathFileName());
+        List<Path> classpathFiles = BuildHelper.findClasspathFiles(runConfiguration.getProjectPath(), runConfiguration.getClasspathFileName());
+        if (classpathFiles.isEmpty()) {
+            throw new IllegalArgumentException("No project's classpath file was found.");
         }
+        LOGGER.debug("Found {} classpath files: {}.", classpathFiles.size(), classpathFiles);
+
+        LOGGER.info("Looking for directories with .class files under {}.", runConfiguration.getProjectPath());
+        // For each folder where classpath file is found, use Maven to determine the build directory (e.g., target/classes). This solution requires setting the maven.home property. We might find a different solution in the future.
+        List<Path> projectDirectories = classpathFiles.stream()
+                .map(Path::getParent)
+                .map(BuildHelper::getMavenOutputDirectory)
+                .filter(Objects::nonNull)
+                .filter(p -> p.toFile().exists())
+                .collect(Collectors.toList());
+        LOGGER.debug("Found {} project directories: {}", projectDirectories.size(), projectDirectories);
+
+        List<String> classpathElements = BuildHelper.readClasspathFiles(classpathFiles);
+        if (classpathFiles.isEmpty()) {
+            throw new IllegalArgumentException("Could not read any project's classpath file.");
+        }
+
+        // Add these directories to the classpath before building the string
+        LOGGER.debug("Collecting .class files from {} project directories and {} classpaths.", projectDirectories.size(), classpathFiles.size());
+        projectDirectories.stream().map(Path::toString).forEach(d -> classpathElements.add(0, d));
+        String cpString = String.join(":", classpathElements);
+        List<String> allClientClasses = BuildHelper.findClassNames(projectDirectories, cpString);
         if (allClientClasses.isEmpty()) {
             throw new IllegalArgumentException("No client classes was found. No generation can be started.");
         }
+        LOGGER.debug("Full project's classpath ({}): {}", classpathElements.size(), cpString);
+        baseCommands.add("-projectCP");
+        baseCommands.add(cpString);
 
         // Create the generation logging directory
         File generationLogBaseDir = runConfiguration.getLogDirPath().toFile();
@@ -160,6 +147,9 @@ public class SiegeRunner {
             }
         }
 
+        LOGGER.info("Using {} seconds budget.", runConfiguration.getBudget());
+        LOGGER.info("Evolving populations of {} individuals.", runConfiguration.getPopulationSize());
+        LOGGER.info("Writing tests in directory {}.", runConfiguration.getTestsDirPath().toFile().getCanonicalPath());
         LOGGER.info("Try to generate tests targeting {} vulnerabilities from a pool of {} client classes.", targetVulnerabilities.size(), allClientClasses.size());
         LOGGER.debug("Vulnerabilities ({}): {}", targetVulnerabilities.size(), targetVulnerabilities);
         LOGGER.debug("Client classes ({}): {}", allClientClasses.size(), allClientClasses);
@@ -168,7 +158,7 @@ public class SiegeRunner {
             Pair<String, ReachabilityTarget> vulnerability = targetVulnerabilities.get(idx);
             LOGGER.info("({}/{}) Generating tests for: {}", idx + 1, targetVulnerabilities.size(), vulnerability.getLeft());
             List<String> baseCommands2 = new ArrayList<>(baseCommands);
-            // NOTE Must replace hyphens with underscores to avoid errors while compiling the tests
+            // Must necessarily replace hyphens with underscores to avoid errors while compiling the tests
             baseCommands2.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
             baseCommands2.add("-Dsiege_target_class=" + vulnerability.getRight().getTargetClass());
             baseCommands2.add("-Dsiege_target_method=" + vulnerability.getRight().getTargetMethod());
@@ -178,8 +168,7 @@ public class SiegeRunner {
             fakeEvoSuiteCommands.add("-class");
             fakeEvoSuiteCommands.add(allClientClasses.get(0));
 
-            // DEBUG
-            /*
+            /* DEBUG
             File fakeGenerationLogFile = null;
             if (generationLogDir != null && generationLogDir.exists()) {
                 fakeGenerationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", allClientClasses.get(0).substring(allClientClasses.get(0).lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
@@ -192,9 +181,9 @@ public class SiegeRunner {
                 }
             }
             fakeEvoSuiteCommands.add("-Dsiege_log_file=" + (fakeGenerationLogFile != null ? fakeGenerationLogFile : ""));
-             */
+            */
 
-            evoSuite.parseCommandLine(fakeEvoSuiteCommands.toArray(new String[0]));
+            fakeEvoSuite.parseCommandLine(fakeEvoSuiteCommands.toArray(new String[0]));
             FileUtils.deleteDirectory(runConfiguration.getTestsDirPath().toFile());
             // NOTE If keeping the Map in StoredStaticPaths does not scale, just store the static paths for the current reachability target
             Set<StaticPath> staticPaths = StoredStaticPaths.getStaticPathsToTarget(vulnerability.getRight().getTargetClass(), vulnerability.getRight().getTargetMethod());
@@ -212,7 +201,7 @@ public class SiegeRunner {
                 LOGGER.warn("No client classes seems to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
                 continue;
             }
-            LOGGER.info("{} client classes statically reach the vulnerability {}.", candidateClientClasses.size(), vulnerability.getLeft());
+            LOGGER.info("{} client classes could expose to vulnerability {}.", candidateClientClasses.size(), vulnerability.getLeft());
             LOGGER.debug("Candidate client classes ({}): {}", candidateClientClasses.size(), candidateClientClasses);
 
             for (String candidateClientClass : candidateClientClasses) {
@@ -237,7 +226,7 @@ public class SiegeRunner {
                 try {
                     // TODO It seems that there are instrumentation exceptions concerning javax and spring packages (they are in the inheritance tree). How to deal with them? Why are not they found in the classpath?
                     evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
-                            evoSuite.parseCommandLine(evoSuiteCommands.toArray(new String[0]));
+                            new EvoSuite().parseCommandLine(evoSuiteCommands.toArray(new String[0]));
                 } catch (Exception e) {
                     // Log and go to next iteration
                     LOGGER.warn("A problem occurred while generating exploits with {}. Skipping it.", candidateClientClass);
@@ -263,13 +252,13 @@ public class SiegeRunner {
         }
     }
 
-    private List<String> selectRelevantClasses(List<String> allClientClasses, Set<StaticPath> staticPaths) {
-        Set<String> candidateClientClasses = new LinkedHashSet<>();
+    private List<String> selectRelevantClasses(List<String> clientClasses, Set<StaticPath> staticPaths) {
+        Set<String> relevantClasses = new LinkedHashSet<>();
         // Sort classes by their proximity to the root of the paths
         Set<StaticPath> relevantPaths = new LinkedHashSet<>();
         for (StaticPath staticPath : staticPaths) {
-            Set<String> calledClasses = new LinkedHashSet<>(staticPath.getCalledClasses());
-            calledClasses.retainAll(allClientClasses);
+            Set<String> calledClasses = new LinkedHashSet<>(clientClasses);
+            calledClasses.retainAll(staticPath.getCalledClasses());
             if (!calledClasses.isEmpty()) {
                 relevantPaths.add(staticPath);
             }
@@ -283,112 +272,15 @@ public class SiegeRunner {
         for (int i = 0; i < maxLength; i++) {
             for (StaticPath staticPath : relevantPaths) {
                 if (i < staticPath.length()) {
-                    candidateClientClasses.add(staticPath.get(i).getClassName());
+                    // Add only if this class comes from the client, not from its dependencies
+                    String newClientClass = staticPath.get(i).getClassName();
+                    if (clientClasses.contains(newClientClass)) {
+                        relevantClasses.add(staticPath.get(i).getClassName());
+                    }
                 }
             }
         }
-        return new ArrayList<>(candidateClientClasses);
-    }
-
-    private void callMaven(List<String> goals, Path directory) throws IOException, MavenInvocationException {
-        if (System.getProperty("maven.home") == null) {
-            // Try to find mvn location
-            ProcessBuilder whichMvn = new ProcessBuilder("which", "mvn");
-            Process proc = whichMvn.start();
-            BufferedReader stdInput = new BufferedReader(new InputStreamReader(proc.getInputStream()));
-            String mavenHome = stdInput.readLine();
-            if (mavenHome == null) {
-                throw new IOException("Could not find Maven. Must supply the directory where Maven can be found via -Dmaven.home JVM property");
-            } else {
-                System.setProperty("maven.home", mavenHome);
-            }
-        }
-        InvocationRequest request = new DefaultInvocationRequest();
-        request.setBaseDirectory(directory.toFile());
-        request.setGoals(goals);
-        request.setBatchMode(true);
-        new DefaultInvoker().execute(request);
-    }
-
-    private List<String> getAllMavenOutputDirectory(Path startDirectory) throws IOException, MavenInvocationException {
-        List<Path> mavenDirectories = getMavenDirectories(startDirectory);
-        List<String> allMavenOutputDirectory = new ArrayList<>();
-        for (Path mavenDirectory : ProgressBar.wrap(mavenDirectories, new ProgressBarBuilder()
-                .setTaskName("Finding Maven Output Directories: ")
-                .setStyle(ProgressBarStyle.ASCII)
-                .setMaxRenderedLength(150)
-                .setConsumer(new ConsoleProgressBarConsumer(System.out, 141))
-        )) {
-            String outDir = getMavenOutputDirectory(mavenDirectory);
-            if (outDir != null && Paths.get(outDir).toFile().exists()) {
-                allMavenOutputDirectory.add(outDir);
-            }
-        }
-        return allMavenOutputDirectory;
-    }
-
-    private List<Path> getMavenDirectories(Path startDirectory) throws IOException {
-        try (Stream<Path> walkStream = Files.walk(startDirectory)) {
-            return walkStream
-                    .filter(p -> p.toFile().isDirectory())
-                    .filter(p -> Objects.requireNonNull(p.toFile().listFiles()).length > 0)
-                    .filter(p -> Objects.requireNonNull(p.toFile().listFiles((dir, name) -> name.equals("pom.xml"))).length > 0)
-                    .collect(Collectors.toList());
-        }
-    }
-
-    // https://maven.apache.org/plugins/maven-help-plugin/evaluate-mojo.html
-    private String getMavenOutputDirectory(Path directory) throws IOException {
-        File tmpfile = File.createTempFile("tmp", ".txt");
-        try {
-            callMaven(Arrays.asList("help:evaluate", "-Dexpression=project.build.outputDirectory", "-q", "-B", "-Doutput=" + tmpfile.getAbsolutePath()), directory);
-            return IOUtils.toString(Files.newInputStream(tmpfile.toPath()), StandardCharsets.UTF_8);
-        } catch (MavenInvocationException e) {
-            return null;
-        } finally {
-            tmpfile.delete();
-        }
-    }
-
-    private List<String> readClasspathFile(Path classpathFile) throws IOException {
-        Set<String> classpath = new LinkedHashSet<>();
-        for (String line : Files.readAllLines(classpathFile)) {
-            List<String> pathElements = Arrays.stream(line.split(":"))
-                    .filter(pe -> Paths.get(pe).toFile().exists())
-                    .collect(Collectors.toList());
-            classpath.addAll(pathElements);
-        }
-        return new ArrayList<>(classpath);
-    }
-
-    // http://maven.apache.org/plugins/maven-dependency-plugin/usage.html#dependency:build-classpath
-    private String buildMavenClasspath(Path directory) throws IOException {
-        File tmpfile = File.createTempFile("tmp", ".txt");
-        try {
-            callMaven(Arrays.asList("dependency:build-classpath", "-q", "-B", "-Dmdep.outputFile=" + tmpfile.getAbsolutePath()), directory);
-            return IOUtils.toString(Files.newInputStream(tmpfile.toPath()), StandardCharsets.UTF_8);
-        } catch (MavenInvocationException e) {
-            return null;
-        } finally {
-            tmpfile.delete();
-        }
-    }
-
-    private List<String> findClassNames(List<String> projectDirectories, String classpath) {
-        List<String> classNames = new ArrayList<>();
-        for (String projectDirectory : projectDirectories) {
-            classNames.addAll(findClassNames(projectDirectory, classpath));
-        }
-        return classNames;
-    }
-
-    private List<String> findClassNames(String projectDirectory, String classpath) {
-        String oldPropertiesCP = Properties.CP;
-        Properties.CP = classpath;
-        ResourceList resourceList = ResourceList.getInstance(TestGenerationContext.getInstance().getClassLoaderForSUT());
-        List<String> classNames = new ArrayList<>(resourceList.getAllClasses(projectDirectory, false));
-        Properties.CP = oldPropertiesCP;
-        return classNames;
+        return new ArrayList<>(relevantClasses);
     }
 
     private void addResults(List<Map<String, String>> allResults, List<List<TestGenerationResult<TestChromosome>>> resultsToAdd, String cve) {

@@ -5,8 +5,8 @@ import org.apache.commons.cli.Options;
 
 public class CLIOptions extends Options {
     public static final String PROJECT_OPT = "project";
-    public static final String CLASSPATH_FILE_OPT = "classpath";
-    public static final String CLIENT_CLASS_OPT = "clientClass";
+    public static final String CLASSPATH_FILE_NAME_OPT = "classpathFileName";
+    //public static final String CLIENT_CLASS_OPT = "clientClass";
     public static final String VULNERABILITIES_OPT = "vulnerabilities";
     public static final String BUDGET_OPT = "budget";
     public static final String POP_SIZE_OPT = "populationSize";
@@ -25,15 +25,17 @@ public class CLIOptions extends Options {
                 .desc("Path to the project to inspect. If the path points to the root of a Maven-based project (i.e., where a pom.xml file is located), the inspected classes will be taken from the default output directory (e.g., target/classes) using the locally-installed Maven (hence, the project must be compiled beforehand). Alternatively, the path can also point to a directory with .class files to inspect.")
                 .build();
 
-        Option classpathFileOpt = Option.builder(CLASSPATH_FILE_OPT)
+        Option classpathFileNameOpt = Option.builder(CLASSPATH_FILE_NAME_OPT)
                 .hasArg(true)
-                .desc("Text file  containing the full classpath of the project to inspect. The classpath can be obtained by running certain Maven goals, such as `mvn -q exec:exec -Dexec.executable=echo -Dexec.args=\"%classpath\"` or `mvn dependency:build-classpath`.")
+                .desc(String.format("Name of the text files containing the classpath of the project's modules to inspect. This file name is searched within the supplied project directory (via option -%s) recursively. Such files could be automatically obtained by running `mvn dependency:build-classpath` or derived manually.", projectOpt.getOpt()))
                 .build();
 
+        /*
         Option clientClassOpt = Option.builder(CLIENT_CLASS_OPT)
                 .hasArg(true)
                 .desc(String.format("The fully-qualified name of a specific class to analyze (e.g., org.foo.SomeClassName). The class must be among the .class files found in the supplied project (via option -%s). If not specified, all the classes will be analyzed.", projectOpt.getOpt()))
                 .build();
+         */
 
         Option vulnerabilitiesOpt = Option.builder(VULNERABILITIES_OPT)
                 .hasArg(true)
@@ -71,8 +73,7 @@ public class CLIOptions extends Options {
                 .build();
 
         addOption(projectOpt);
-        addOption(classpathFileOpt);
-        addOption(clientClassOpt);
+        addOption(classpathFileNameOpt);
         addOption(vulnerabilitiesOpt);
         addOption(budgetOpt);
         addOption(populationOpt);
