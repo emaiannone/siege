@@ -235,6 +235,7 @@ public class SiegeRunner {
                 evoSuiteCommands.add(candidateClientClass);
                 List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
                 try {
+                    // TODO It seems that there are instrumentation exceptions concerning javax and spring packages (they are in the inheritance tree). How to deal with them? Why are not they found in the classpath?
                     evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
                             evoSuite.parseCommandLine(evoSuiteCommands.toArray(new String[0]));
                 } catch (Exception e) {
@@ -495,6 +496,9 @@ public class SiegeRunner {
     }
 
     private void deleteEmptyTestFiles(Path testsDirPath) throws IOException {
+        if (!testsDirPath.toFile().exists()) {
+            return;
+        }
         List<Path> outputFiles;
         try (Stream<Path> stream = Files.walk(testsDirPath)) {
             outputFiles = stream.filter(Files::isRegularFile)
