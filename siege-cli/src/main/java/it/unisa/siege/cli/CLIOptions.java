@@ -13,6 +13,7 @@ public class CLIOptions extends Options {
     public static final String TESTS_DIR_OPT = "testsDir";
     public static final String OUT_FILE_OPT = "outFile";
     public static final String LOG_DIR_OPT = "logDir";
+    public static final String KEEP_EMPTY_TESTS_OPT = "keepEmptyTests";
     public static final String HELP_OPT = "help";
     public static final int BUDGET_DEFAUlT = 60;
     public static final int POP_SIZE_DEFAUlT = 100;
@@ -67,6 +68,11 @@ public class CLIOptions extends Options {
                 .desc("Path to a directory where the detail of the generations will be stored.")
                 .build();
 
+        Option keepEmptyTestsOpt = Option.builder(KEEP_EMPTY_TESTS_OPT)
+                .hasArg(false)
+                .desc("Flag that indicates whether to keep the empty test (i.e., when the generation fails to produce any valid test).")
+                .build();
+
         Option helpOpt = Option.builder(HELP_OPT)
                 .hasArg(false)
                 .desc("Show the options available, ignoring all other options used.")
@@ -80,6 +86,7 @@ public class CLIOptions extends Options {
         addOption(testsDirOpt);
         addOption(outFileOpt);
         addOption(logDirOpt);
+        addOption(keepEmptyTestsOpt);
         addOption(helpOpt);
     }
 

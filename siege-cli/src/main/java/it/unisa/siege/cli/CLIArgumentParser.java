@@ -1,7 +1,7 @@
 package it.unisa.siege.cli;
 
 import it.unisa.siege.core.RunConfiguration;
-import it.unisa.siege.core.SiegeIO;
+import it.unisa.siege.core.SiegeIOHelper;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.tuple.Pair;
 import org.evosuite.coverage.reachability.ReachabilityTarget;
@@ -48,7 +48,7 @@ public class CLIArgumentParser {
         String vulnerabilitiesFilePath = commandLine.getOptionValue(CLIOptions.VULNERABILITIES_OPT);
         List<Pair<String, ReachabilityTarget>> vulnerabilityList;
         try {
-            vulnerabilityList = new ArrayList<>(SiegeIO.readAndParseCsv(Paths.get(vulnerabilitiesFilePath)));
+            vulnerabilityList = new ArrayList<>(SiegeIOHelper.readAndParseCsv(Paths.get(vulnerabilitiesFilePath)));
         } catch (IOException e) {
             throw new IOException("Cannot find or parse the CSV containing the vulnerabilities.", e);
         }
@@ -93,6 +93,8 @@ public class CLIArgumentParser {
         String logDirArg = commandLine.getOptionValue(CLIOptions.LOG_DIR_OPT);
         Path logDirPath = logDirArg != null ? Paths.get(logDirArg) : null;
 
-        return new RunConfiguration(projectPath, classpathFileName, vulnerabilityList, budget, popSize, testsDirPath, outFilePath, logDirPath);
+        boolean keepEmptyTests = commandLine.hasOption(CLIOptions.KEEP_EMPTY_TESTS_OPT);
+
+        return new RunConfiguration(projectPath, classpathFileName, vulnerabilityList, budget, popSize, testsDirPath, outFilePath, logDirPath, keepEmptyTests);
     }
 }

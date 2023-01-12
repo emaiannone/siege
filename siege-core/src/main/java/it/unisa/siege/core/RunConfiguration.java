@@ -15,8 +15,9 @@ public class RunConfiguration {
     private final Path testsDirPath;
     private final Path outFilePath;
     private final Path logDirPath;
+    private final boolean keepEmptyTests;
 
-    public RunConfiguration(Path projectPath, String classpathFileName, List<Pair<String, ReachabilityTarget>> targetVulnerabilities, int budget, int populationSize, Path testsDirPath, Path outFilePath, Path logDirPath) {
+    public RunConfiguration(Path projectPath, String classpathFileName, List<Pair<String, ReachabilityTarget>> targetVulnerabilities, int budget, int populationSize, Path testsDirPath, Path outFilePath, Path logDirPath, boolean keepEmptyTests) {
         this.projectPath = projectPath;
         this.classpathFileName = classpathFileName;
         this.targetVulnerabilities = targetVulnerabilities;
@@ -25,6 +26,7 @@ public class RunConfiguration {
         this.testsDirPath = testsDirPath;
         this.outFilePath = outFilePath;
         this.logDirPath = logDirPath;
+        this.keepEmptyTests = keepEmptyTests;
     }
 
     public Path getProjectPath() {
@@ -57,5 +59,9 @@ public class RunConfiguration {
 
     public Path getLogDirPath() {
         return logDirPath;
+    }
+
+    public boolean isKeepEmptyTests() {
+        return keepEmptyTests;
     }
 }

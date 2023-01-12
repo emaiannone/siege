@@ -1,7 +1,6 @@
 package it.unisa.siege.core;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.evosuite.EvoSuite;
@@ -21,13 +20,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class SiegeRunner {
     public static final String STATUS_UNREACHABLE = "UNREACHABLE";
@@ -227,7 +224,6 @@ public class SiegeRunner {
                 evoSuiteCommands.add(entryPoint);
                 List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
                 try {
-                    // TODO It seems that there are instrumentation exceptions concerning javax and spring packages (they are in the inheritance tree). How to deal with them? Why are not they found in the classpath?
                     evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
                             new EvoSuite().parseCommandLine(evoSuiteCommands.toArray(new String[0]));
                 } catch (Exception e) {
@@ -236,9 +232,9 @@ public class SiegeRunner {
                     LOGGER.error(ExceptionUtils.getStackTrace(e));
                     continue;
                 }
-                // TODO Call this only if -keepEmptyTests (a new option to add) is not set.
-                deleteEmptyTestFiles(runConfiguration.getTestsDirPath());
-
+                if (!runConfiguration.isKeepEmptyTests()) {
+                    SiegeIOHelper.deleteEmptyTestFiles(runConfiguration.getTestsDirPath());
+                }
                 addResults(allResults, evoSuiteResults, vulnerability.getLeft());
             }
         }
@@ -246,7 +242,7 @@ public class SiegeRunner {
         Path outFilePath = runConfiguration.getOutFilePath();
         try {
             if (outFilePath != null) {
-                SiegeIO.writeToCsv(outFilePath, allResults);
+                SiegeIOHelper.writeToCsv(outFilePath, allResults);
             }
         } catch (IOException e) {
             LOGGER.error("Failed to export the results on file {}. Printing on stdout instead.", outFilePath);
@@ -357,35 +353,6 @@ public class SiegeRunner {
 
     private double getBestFitness(TestChromosome individual) {
         return Collections.min(individual.getFitnessValues().values());
-    }
-
-    private void deleteEmptyTestFiles(Path testsDirPath) throws IOException {
-        if (!testsDirPath.toFile().exists()) {
-            return;
-        }
-        List<Path> outputFiles;
-        try (Stream<Path> stream = Files.walk(testsDirPath)) {
-            outputFiles = stream.filter(Files::isRegularFile)
-                    .filter(f -> FilenameUtils.getExtension(String.valueOf(f)).equals("java")).collect(Collectors.toList());
-        }
-        List<Path> emptyTestFiles = outputFiles.stream()
-                .filter(f -> !f.getFileName().toString().contains("scaffolding"))
-                .filter(SiegeIO::isTestFileEmpty)
-                .collect(Collectors.toList());
-        List<Path> filesToDelete = new ArrayList<>();
-        for (Path emptyTestFilePath : emptyTestFiles) {
-            filesToDelete.add(emptyTestFilePath);
-            String testFileName = emptyTestFilePath.toString();
-            String testFileBaseName = testFileName.substring(0, testFileName.lastIndexOf("."));
-            String scaffoldingFileName = testFileBaseName + "_scaffolding.java";
-            Path scaffoldingFilePath = Paths.get(scaffoldingFileName);
-            if (outputFiles.contains(scaffoldingFilePath)) {
-                filesToDelete.add(scaffoldingFilePath);
-            }
-        }
-        for (Path path : filesToDelete) {
-            path.toFile().delete();
-        }
     }
 
 }
