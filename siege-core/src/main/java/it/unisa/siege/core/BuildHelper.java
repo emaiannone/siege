@@ -51,10 +51,10 @@ public class BuildHelper {
         return new ArrayList<>(classpath);
     }
 
-    public static List<String> findClassNames(List<Path> projectDirectories, String classpath) {
+    public static List<String> findClasses(List<Path> directories, String classpath) {
         Set<String> classNames = new LinkedHashSet<>();
-        for (Path projectDirectory : projectDirectories) {
-            classNames.addAll(findClassNames(projectDirectory, classpath));
+        for (Path dir : directories) {
+            classNames.addAll(findClasses(dir, classpath));
         }
         return new ArrayList<>(classNames);
     }
@@ -75,11 +75,11 @@ public class BuildHelper {
         }
     }
 
-    private static List<String> findClassNames(Path projectDirectory, String classpath) {
+    private static List<String> findClasses(Path dir, String classpath) {
         String oldPropertiesCP = Properties.CP;
         Properties.CP = classpath;
         ResourceList resourceList = ResourceList.getInstance(TestGenerationContext.getInstance().getClassLoaderForSUT());
-        List<String> classNames = new ArrayList<>(resourceList.getAllClasses(projectDirectory.toString(), false));
+        List<String> classNames = new ArrayList<>(resourceList.getAllClasses(dir.toString(), false));
         Properties.CP = oldPropertiesCP;
         return classNames;
     }

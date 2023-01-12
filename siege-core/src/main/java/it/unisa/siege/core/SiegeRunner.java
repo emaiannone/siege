@@ -115,11 +115,14 @@ public class SiegeRunner {
 
         // Add these directories to the classpath before building the string
         LOGGER.debug("Collecting .class files from {} project directories and {} classpaths.", projectDirectories.size(), classpathFiles.size());
-        projectDirectories.stream().map(Path::toString).forEach(d -> classpathElements.add(0, d));
+        projectDirectories.stream()
+                .sorted(Collections.reverseOrder())
+                .map(Path::toString)
+                .forEach(d -> classpathElements.add(0, d));
         String cpString = String.join(":", classpathElements);
-        List<String> allClientClasses = BuildHelper.findClassNames(projectDirectories, cpString);
-        if (allClientClasses.isEmpty()) {
-            throw new IllegalArgumentException("No client classes was found. No generation can be started.");
+        List<String> clientClasses = BuildHelper.findClasses(projectDirectories, cpString);
+        if (clientClasses.isEmpty()) {
+            throw new IllegalArgumentException("No client classes were found. No generations can be started.");
         }
         LOGGER.debug("Full project's classpath ({}): {}", classpathElements.size(), cpString);
         baseCommands.add("-projectCP");
@@ -150,9 +153,9 @@ public class SiegeRunner {
         LOGGER.info("Using {} seconds budget.", runConfiguration.getBudget());
         LOGGER.info("Evolving populations of {} individuals.", runConfiguration.getPopulationSize());
         LOGGER.info("Writing tests in directory {}.", runConfiguration.getTestsDirPath().toFile().getCanonicalPath());
-        LOGGER.info("Try to generate tests targeting {} vulnerabilities from a pool of {} client classes.", targetVulnerabilities.size(), allClientClasses.size());
+        LOGGER.info("Try to generate tests targeting {} vulnerabilities from a pool of {} client classes.", targetVulnerabilities.size(), clientClasses.size());
         LOGGER.debug("Vulnerabilities ({}): {}", targetVulnerabilities.size(), targetVulnerabilities);
-        LOGGER.debug("Client classes ({}): {}", allClientClasses.size(), allClientClasses);
+        LOGGER.debug("Client classes ({}): {}", clientClasses.size(), clientClasses);
         List<Map<String, String>> allResults = new ArrayList<>();
         for (int idx = 0; idx < targetVulnerabilities.size(); idx++) {
             Pair<String, ReachabilityTarget> vulnerability = targetVulnerabilities.get(idx);
@@ -166,7 +169,7 @@ public class SiegeRunner {
             LOGGER.info("Doing a fake EvoSuite run to collect static paths to target {}", vulnerability.getRight());
             List<String> fakeEvoSuiteCommands = new ArrayList<>(baseCommands2);
             fakeEvoSuiteCommands.add("-class");
-            fakeEvoSuiteCommands.add(allClientClasses.get(0));
+            fakeEvoSuiteCommands.add(clientClasses.get(0));
 
             /* DEBUG
             File fakeGenerationLogFile = null;
@@ -194,22 +197,22 @@ public class SiegeRunner {
                 continue;
             }
 
-            // This function gives higher priority to the classes near the root.
-            // TODO Prioritize the candidate client classes using a measure of probability of exploitation (heuristic-based)
-            List<String> candidateClientClasses = selectRelevantClasses(allClientClasses, staticPaths);
-            if (candidateClientClasses.isEmpty()) {
+            // TODO Make another EntryPointFinder class that prioritize using a measure of probability of exploitation (heuristic-based)
+            // This method gives higher priority to the classes near the root.
+            List<String> entryPoints = new RootProximityEntryPointFinder().findEntryPoints(clientClasses, staticPaths);
+            if (entryPoints.isEmpty()) {
                 LOGGER.warn("No client classes seems to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
                 continue;
             }
-            LOGGER.info("{} client classes could expose to vulnerability {}.", candidateClientClasses.size(), vulnerability.getLeft());
-            LOGGER.debug("Candidate client classes ({}): {}", candidateClientClasses.size(), candidateClientClasses);
+            LOGGER.info("{} client classes could expose to vulnerability {}.", entryPoints.size(), vulnerability.getLeft());
+            LOGGER.debug("Entry point client classes ({}): {}", entryPoints.size(), entryPoints);
 
-            for (String candidateClientClass : candidateClientClasses) {
-                LOGGER.info("Starting the test generation from client class: {}", candidateClientClass);
+            for (String entryPoint : entryPoints) {
+                LOGGER.info("Starting the test generation from client class: {}", entryPoint);
                 // Create the generation logging file for this run
                 File generationLogFile = null;
                 if (generationLogDir != null && generationLogDir.exists()) {
-                    generationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", candidateClientClass.substring(candidateClientClass.lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
+                    generationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", entryPoint.substring(entryPoint.lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
                     try {
                         if (generationLogFile.createNewFile()) {
                             LOGGER.info("Writing the generation log in file {}.", generationLogFile);
@@ -221,7 +224,7 @@ public class SiegeRunner {
                 List<String> evoSuiteCommands = new ArrayList<>(baseCommands2);
                 evoSuiteCommands.add("-Dsiege_log_file=" + (generationLogFile != null ? generationLogFile : ""));
                 evoSuiteCommands.add("-class");
-                evoSuiteCommands.add(candidateClientClass);
+                evoSuiteCommands.add(entryPoint);
                 List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
                 try {
                     // TODO It seems that there are instrumentation exceptions concerning javax and spring packages (they are in the inheritance tree). How to deal with them? Why are not they found in the classpath?
@@ -229,7 +232,7 @@ public class SiegeRunner {
                             new EvoSuite().parseCommandLine(evoSuiteCommands.toArray(new String[0]));
                 } catch (Exception e) {
                     // Log and go to next iteration
-                    LOGGER.warn("A problem occurred while generating exploits with {}. Skipping it.", candidateClientClass);
+                    LOGGER.warn("A problem occurred while generating exploits with {}. Skipping it.", entryPoint);
                     LOGGER.error(ExceptionUtils.getStackTrace(e));
                     continue;
                 }
@@ -250,37 +253,6 @@ public class SiegeRunner {
             LOGGER.error("\t* {}", ExceptionUtils.getStackTrace(e));
             LOGGER.info(String.valueOf(allResults));
         }
-    }
-
-    private List<String> selectRelevantClasses(List<String> clientClasses, Set<StaticPath> staticPaths) {
-        Set<String> relevantClasses = new LinkedHashSet<>();
-        // Sort classes by their proximity to the root of the paths
-        Set<StaticPath> relevantPaths = new LinkedHashSet<>();
-        for (StaticPath staticPath : staticPaths) {
-            Set<String> calledClasses = new LinkedHashSet<>(clientClasses);
-            calledClasses.retainAll(staticPath.getCalledClasses());
-            if (!calledClasses.isEmpty()) {
-                relevantPaths.add(staticPath);
-            }
-        }
-        if (relevantPaths.isEmpty()) {
-            return new ArrayList<>();
-        }
-        int maxLength = relevantPaths.stream()
-                .mapToInt(p -> p.getCalledClasses().size())
-                .max().getAsInt();
-        for (int i = 0; i < maxLength; i++) {
-            for (StaticPath staticPath : relevantPaths) {
-                if (i < staticPath.length()) {
-                    // Add only if this class comes from the client, not from its dependencies
-                    String newClientClass = staticPath.get(i).getClassName();
-                    if (clientClasses.contains(newClientClass)) {
-                        relevantClasses.add(staticPath.get(i).getClassName());
-                    }
-                }
-            }
-        }
-        return new ArrayList<>(relevantClasses);
     }
 
     private void addResults(List<Map<String, String>> allResults, List<List<TestGenerationResult<TestChromosome>>> resultsToAdd, String cve) {
