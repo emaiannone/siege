@@ -18,7 +18,6 @@ public class SiegeResults {
     public static final String OUTCOME_SUCCESS = "SUCCESS";
     public static final String OUTCOME_FAILED = "FAILED";
     private static final String HEADER_ENTRY_PATHS = "entryPaths";
-    private static final String HEADER_COVERED_PATHS = "coveredPaths";
     private static final String HEADER_TOTAL_BUDGET = "totalBudget";
     private static final String HEADER_SPENT_BUDGET = "spentBudget";
     private static final String HEADER_POPULATION_SIZE = "populationSize";
@@ -54,14 +53,13 @@ public class SiegeResults {
                 // Get the individuals covering any goal
                 TestChromosome bestIndividual = getBestIndividual(algorithm);
                 // Use ad hoc function because getFitness() offered by EvoSuite does not "fit" our needs
-                double bestFitness = getBestFitness(bestIndividual);
+                double bestFitness = bestIndividual != null ? getBestFitness(bestIndividual) : Double.MAX_VALUE;
 
                 result.put(HEADER_ENTRY_PATHS, String.valueOf(algorithm.getFitnessFunctions().size()));
-                result.put(HEADER_COVERED_PATHS, String.valueOf(0));
                 result.put(HEADER_TOTAL_BUDGET, String.valueOf(totalBudget));
                 result.put(HEADER_SPENT_BUDGET, String.valueOf(spentBudget));
                 result.put(HEADER_POPULATION_SIZE, String.valueOf(Properties.POPULATION));
-                result.put(HEADER_BEST_FITNESS, String.valueOf(bestFitness));
+                result.put(HEADER_BEST_FITNESS, String.valueOf(bestFitness != Double.MAX_VALUE ? bestFitness : "MAX"));
                 result.put(HEADER_ITERATIONS, String.valueOf(algorithm.getAge() + 1));
                 if (wroteTests.isEmpty()) {
                     result.put(HEADER_OUTCOME, OUTCOME_FAILED);
