@@ -8,12 +8,7 @@ import org.evosuite.Properties;
 import org.evosuite.analysis.StoredStaticPaths;
 import org.evosuite.coverage.reachability.ReachabilityTarget;
 import org.evosuite.coverage.reachability.StaticPath;
-import org.evosuite.ga.FitnessFunction;
-import org.evosuite.ga.metaheuristics.GeneticAlgorithm;
-import org.evosuite.ga.stoppingconditions.MaxTimeStoppingCondition;
-import org.evosuite.ga.stoppingconditions.StoppingCondition;
 import org.evosuite.result.TestGenerationResult;
-import org.evosuite.testcase.TestCase;
 import org.evosuite.testcase.TestChromosome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,27 +22,38 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class SiegeRunner {
-    public static final String STATUS_UNREACHABLE = "UNREACHABLE";
-    public static final String STATUS_SUCCESS = "SUCCESS";
-    public static final String STATUS_FAILED = "FAILED";
     private static final Logger LOGGER = LoggerFactory.getLogger(SiegeRunner.class);
     private final RunConfiguration runConfiguration;
+    private final SiegeResults siegeResults;
+    private EvoSuite fakeEvoSuite;
+    private List<String> baseCommands;
+    private List<Pair<String, ReachabilityTarget>> targetVulnerabilities;
+    private List<Path> classpathFiles;
+    private List<String> classpathElements;
+    private List<String> clientClasses;
+    private File generationLogDir;
 
-    public SiegeRunner(RunConfiguration runConfiguration) {
+    public SiegeRunner(RunConfiguration runConfiguration) throws Exception {
         this.runConfiguration = runConfiguration;
+        this.siegeResults = new SiegeResults();
+        preprocess();
     }
 
-    public void run() throws IOException {
-        List<Pair<String, ReachabilityTarget>> targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
+    public void run() throws Exception {
+        generate();
+    }
+
+    private void preprocess() throws Exception {
+        targetVulnerabilities = runConfiguration.getTargetVulnerabilities();
         if (targetVulnerabilities.isEmpty()) {
             LOGGER.warn("No vulnerabilities to reach. No generation can be done.");
             return;
         }
 
         // Instantiate EvoSuite now just to update the logging context
-        EvoSuite fakeEvoSuite = new EvoSuite();
+        fakeEvoSuite = new EvoSuite();
         LOGGER.info("Analyzing project: {}.", runConfiguration.getProjectPath());
-        List<String> baseCommands = new ArrayList<>(Arrays.asList(
+        baseCommands = new ArrayList<>(Arrays.asList(
                 "-generateTests",
                 "-criterion", Properties.Criterion.REACHABILITY.name(),
                 "-Dbranch_awareness=true",
@@ -89,7 +95,7 @@ public class SiegeRunner {
          */
 
         LOGGER.info("Looking for classpath files named: {}.", runConfiguration.getClasspathFileName());
-        List<Path> classpathFiles = BuildHelper.findClasspathFiles(runConfiguration.getProjectPath(), runConfiguration.getClasspathFileName());
+        classpathFiles = BuildHelper.findClasspathFiles(runConfiguration.getProjectPath(), runConfiguration.getClasspathFileName());
         if (classpathFiles.isEmpty()) {
             throw new IllegalArgumentException("No project's classpath file was found.");
         }
@@ -105,7 +111,7 @@ public class SiegeRunner {
                 .collect(Collectors.toList());
         LOGGER.debug("Found {} project directories: {}", projectDirectories.size(), projectDirectories);
 
-        List<String> classpathElements = BuildHelper.readClasspathFiles(classpathFiles);
+        classpathElements = BuildHelper.readClasspathFiles(classpathFiles);
         if (classpathFiles.isEmpty()) {
             throw new IllegalArgumentException("Could not read any project's classpath file.");
         }
@@ -117,7 +123,7 @@ public class SiegeRunner {
                 .map(Path::toString)
                 .forEach(d -> classpathElements.add(0, d));
         String cpString = String.join(":", classpathElements);
-        List<String> clientClasses = BuildHelper.findClasses(projectDirectories, cpString);
+        clientClasses = BuildHelper.findClasses(projectDirectories, cpString);
         if (clientClasses.isEmpty()) {
             throw new IllegalArgumentException("No client classes were found. No generations can be started.");
         }
@@ -133,7 +139,6 @@ public class SiegeRunner {
                 LOGGER.warn("Failed to create the generation log directory. No generation details will be logged.");
             }
         }
-        File generationLogDir = null;
         if (generationLogBaseDir != null) {
             generationLogDir = Paths.get(generationLogBaseDir.getCanonicalPath(), new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date())).toFile();
             if (!generationLogDir.exists()) {
@@ -146,25 +151,27 @@ public class SiegeRunner {
                 LOGGER.info("Writing the generation log in directory {}.", generationLogDir.getCanonicalPath());
             }
         }
-
         LOGGER.info("Using {} seconds budget.", runConfiguration.getBudget());
         LOGGER.info("Evolving populations of {} individuals.", runConfiguration.getPopulationSize());
         LOGGER.info("Writing tests in directory {}.", runConfiguration.getTestsDirPath().toFile().getCanonicalPath());
-        LOGGER.info("Try to generate tests targeting {} vulnerabilities from a pool of {} client classes.", targetVulnerabilities.size(), clientClasses.size());
+    }
+
+    private void generate() throws IOException {
+        LOGGER.info("Starting the generation session.");
+        LOGGER.info("Generating tests targeting {} vulnerabilities from a pool of {} client classes.", targetVulnerabilities.size(), clientClasses.size());
         LOGGER.debug("Vulnerabilities ({}): {}", targetVulnerabilities.size(), targetVulnerabilities);
         LOGGER.debug("Client classes ({}): {}", clientClasses.size(), clientClasses);
-        List<Map<String, String>> allResults = new ArrayList<>();
         for (int idx = 0; idx < targetVulnerabilities.size(); idx++) {
             Pair<String, ReachabilityTarget> vulnerability = targetVulnerabilities.get(idx);
             LOGGER.info("({}/{}) Generating tests for: {}", idx + 1, targetVulnerabilities.size(), vulnerability.getLeft());
-            List<String> baseCommands2 = new ArrayList<>(baseCommands);
+            List<String> baseCommandsExtended = new ArrayList<>(baseCommands);
             // Must necessarily replace hyphens with underscores to avoid errors while compiling the tests
-            baseCommands2.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
-            baseCommands2.add("-Dsiege_target_class=" + vulnerability.getRight().getTargetClass());
-            baseCommands2.add("-Dsiege_target_method=" + vulnerability.getRight().getTargetMethod());
+            baseCommandsExtended.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
+            baseCommandsExtended.add("-Dsiege_target_class=" + vulnerability.getRight().getTargetClass());
+            baseCommandsExtended.add("-Dsiege_target_method=" + vulnerability.getRight().getTargetMethod());
 
-            LOGGER.info("Doing a fake EvoSuite run to collect static paths to target {}", vulnerability.getRight());
-            List<String> fakeEvoSuiteCommands = new ArrayList<>(baseCommands2);
+            LOGGER.info("Doing a fake EvoSuite run to collect static paths to: {}", vulnerability.getRight());
+            List<String> fakeEvoSuiteCommands = new ArrayList<>(baseCommandsExtended);
             fakeEvoSuiteCommands.add("-class");
             fakeEvoSuiteCommands.add(clientClasses.get(0));
 
@@ -187,14 +194,14 @@ public class SiegeRunner {
             FileUtils.deleteDirectory(runConfiguration.getTestsDirPath().toFile());
             // NOTE If keeping the Map in StoredStaticPaths does not scale, just store the static paths for the current reachability target
             Set<StaticPath> staticPaths = StoredStaticPaths.getStaticPathsToTarget(vulnerability.getRight().getTargetClass(), vulnerability.getRight().getTargetMethod());
-            LOGGER.info("Found {} static paths that could reach the target {}.", staticPaths.size(), vulnerability.getRight());
+            LOGGER.info("Found {} static paths that could reach: {}.", staticPaths.size(), vulnerability.getRight());
             LOGGER.debug("Static paths to target ({}): {}", staticPaths.size(), staticPaths);
             if (staticPaths.isEmpty()) {
                 LOGGER.warn("No client classes seem to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
                 continue;
             }
 
-            // TODO Make another EntryPointFinder class that prioritize using a measure of probability of exploitation (heuristic-based)
+            // TODO Make another EntryPointFinder class that prioritize using a measure of probability of exploitation (heuristic-based). The EntryPointFinder type is selected with a CLI option and a factory
             // This method gives higher priority to the classes near the root.
             List<String> entryPoints = new RootProximityEntryPointFinder().findEntryPoints(clientClasses, staticPaths);
             if (entryPoints.isEmpty()) {
@@ -203,22 +210,21 @@ public class SiegeRunner {
             }
             LOGGER.info("{} client classes could expose to vulnerability {}.", entryPoints.size(), vulnerability.getLeft());
             LOGGER.debug("Entry point client classes ({}): {}", entryPoints.size(), entryPoints);
-
             for (String entryPoint : entryPoints) {
-                LOGGER.info("Starting the test generation from client class: {}", entryPoint);
+                LOGGER.info("Starting the generation from class: {}", entryPoint);
                 // Create the generation logging file for this run
                 File generationLogFile = null;
                 if (generationLogDir != null && generationLogDir.exists()) {
                     generationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", entryPoint.substring(entryPoint.lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
                     try {
                         if (generationLogFile.createNewFile()) {
-                            LOGGER.info("Writing the generation log in file {}.", generationLogFile);
+                            LOGGER.info("Writing the generation log in file: {}.", generationLogFile);
                         }
                     } catch (IOException e) {
                         LOGGER.warn("Failed to create the generation log file. No generation log will be written for this run.");
                     }
                 }
-                List<String> evoSuiteCommands = new ArrayList<>(baseCommands2);
+                List<String> evoSuiteCommands = new ArrayList<>(baseCommandsExtended);
                 evoSuiteCommands.add("-Dsiege_log_file=" + (generationLogFile != null ? generationLogFile : ""));
                 evoSuiteCommands.add("-class");
                 evoSuiteCommands.add(entryPoint);
@@ -235,124 +241,25 @@ public class SiegeRunner {
                 if (!runConfiguration.isKeepEmptyTests()) {
                     SiegeIOHelper.deleteEmptyTestFiles(runConfiguration.getTestsDirPath());
                 }
-                addResults(allResults, evoSuiteResults, vulnerability.getLeft());
+                siegeResults.addResults(vulnerability.getLeft(), evoSuiteResults);
+                export();
             }
         }
+    }
+
+    private void export() {
         // Export time
         Path outFilePath = runConfiguration.getOutFilePath();
+        List<Map<String, String>> resultsToExport = siegeResults.export();
         try {
             if (outFilePath != null) {
-                SiegeIOHelper.writeToCsv(outFilePath, allResults);
+                SiegeIOHelper.writeToCsv(outFilePath, resultsToExport);
             }
         } catch (IOException e) {
             LOGGER.error("Failed to export the results on file {}. Printing on stdout instead.", outFilePath);
             LOGGER.error("\t* {}", ExceptionUtils.getStackTrace(e));
-            LOGGER.info(String.valueOf(allResults));
+            LOGGER.info(String.valueOf(resultsToExport));
         }
-    }
-
-    private void addResults(List<Map<String, String>> allResults, List<List<TestGenerationResult<TestChromosome>>> resultsToAdd, String cve) {
-        LOGGER.info("Results for {}", cve);
-        if (resultsToAdd.size() > 0) {
-            for (List<TestGenerationResult<TestChromosome>> testResults : resultsToAdd) {
-                for (TestGenerationResult<TestChromosome> clientClassResult : testResults) {
-                    Map<String, String> result = new LinkedHashMap<>();
-                    GeneticAlgorithm<TestChromosome> algorithm = clientClassResult.getGeneticAlgorithm();
-                    String clientClassUnderTest = clientClassResult.getClassUnderTest();
-                    result.put("cve", cve);
-                    result.put("clientClass", clientClassUnderTest);
-                    Map<String, TestCase> wroteTests = clientClassResult.getTestCases();
-                    if (wroteTests.isEmpty()) {
-                        result.putAll(createUnreachableResult());
-                        allResults.add(result);
-                        LOGGER.info("|-> Could not be reached from class '{}'", clientClassUnderTest);
-                        continue;
-                    }
-
-                    // Since EvoSuite does not properly handle the getCurrentValue() method in MaxTimeStoppingCondition, I use an ad hoc method.
-                    // For the same reason, isFinished() is unreliable: we have to use spentBudget <= SEARCH_BUDGET
-                    long spentBudget = 0;
-                    long totalBudget = Properties.SEARCH_BUDGET;
-                    for (StoppingCondition<TestChromosome> stoppingCondition : algorithm.getStoppingConditions()) {
-                        if (stoppingCondition instanceof MaxTimeStoppingCondition) {
-                            MaxTimeStoppingCondition<TestChromosome> timeStoppingCondition = (MaxTimeStoppingCondition<TestChromosome>) stoppingCondition;
-                            spentBudget = timeStoppingCondition.getSpentBudget();
-                            break;
-                        }
-                    }
-                    // Get the individuals covering any goal
-                    TestChromosome bestIndividual = getBestIndividual(algorithm);
-                    // Use ad hoc function because getFitness() offered by EvoSuite does not "fit" our needs
-                    double bestFitness = getBestFitness(bestIndividual);
-                    // Check if budget is not exhausted and at least one goal was covered
-                    if (spentBudget < totalBudget && bestFitness == 0) {
-                        result.put("status", STATUS_SUCCESS);
-                    } else {
-                        result.put("status", STATUS_FAILED);
-                    }
-                    long iterations = algorithm.getAge() + 1;
-
-                    result.put("entryPaths", String.valueOf(algorithm.getFitnessFunctions().size()));
-                    result.put("exploitedPaths", String.valueOf(wroteTests.size()));
-                    result.put("totalBudget", String.valueOf(totalBudget));
-                    result.put("spentBudget", String.valueOf(spentBudget));
-                    result.put("populationSize", String.valueOf(Properties.POPULATION));
-                    result.put("bestFitness", String.valueOf(bestFitness));
-                    result.put("iterations", String.valueOf(iterations));
-                    allResults.add(result);
-                    LOGGER.info("|-> Reached via {}/{} paths from class '{}'", result.get("exploitedPaths"), result.get("entryPaths"), result.get("clientClass"));
-                    LOGGER.info("|-> Using {}/{} seconds, within {} iterations.", result.get("spentBudget"), result.get("totalBudget"), result.get("iterations"));
-                }
-            }
-        } else {
-            // TODO Probably this is now unneeded: to be removed. When this is removed, createUnreachableResult() can be inlined
-            Map<String, String> result = new LinkedHashMap<>();
-            result.put("cve", cve);
-            result.put("status", STATUS_UNREACHABLE);
-            allResults.add(result);
-            LOGGER.info("--> Could not be reached from any client class");
-        }
-    }
-
-    private Map<String, String> createUnreachableResult() {
-        Map<String, String> result = new LinkedHashMap<>();
-        result.put("status", STATUS_UNREACHABLE);
-        result.put("entryPaths", "0");
-        result.put("exploitedPaths", "0");
-        result.put("totalBudget", String.valueOf(Properties.SEARCH_BUDGET));
-        result.put("spentBudget", "");
-        result.put("populationSize", String.valueOf(Properties.POPULATION));
-        result.put("bestFitness", "");
-        result.put("iterations", "");
-        return result;
-    }
-
-    private TestChromosome getBestIndividual(GeneticAlgorithm<TestChromosome> algorithm) {
-        List<? extends FitnessFunction<TestChromosome>> fitnessFunctions = algorithm.getFitnessFunctions();
-        List<TestChromosome> population = algorithm.getPopulation();
-        List<TestChromosome> coveringIndividuals = population.stream()
-                .filter(tc -> fitnessFunctions.stream().anyMatch(fit -> tc.getFitness(fit) == 0))
-                .collect(Collectors.toList());
-        if (coveringIndividuals.size() > 0) {
-            // Prefer the shortest one
-            return coveringIndividuals.stream().min(Comparator.comparingInt(tc -> tc.getTestCase().size())).orElse(null);
-        } else {
-            // When there are no covering individuals get the top minimal fitness (among all goals)
-            double minFitness = Double.MAX_VALUE;
-            TestChromosome bestIndividual = null;
-            for (TestChromosome tc : population) {
-                double bestFit = getBestFitness(tc);
-                if (bestFit < minFitness) {
-                    minFitness = bestFit;
-                    bestIndividual = tc;
-                }
-            }
-            return bestIndividual;
-        }
-    }
-
-    private double getBestFitness(TestChromosome individual) {
-        return Collections.min(individual.getFitnessValues().values());
     }
 
 }

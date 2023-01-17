@@ -7,6 +7,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.evosuite.Properties;
 import org.evosuite.coverage.reachability.ReachabilityTarget;
 
 import java.io.*;
@@ -73,7 +74,7 @@ public class SiegeIOHelper {
                     .filter(f -> FilenameUtils.getExtension(String.valueOf(f)).equals("java")).collect(Collectors.toList());
         }
         List<Path> emptyTestFiles = outputFiles.stream()
-                .filter(f -> !f.getFileName().toString().contains("scaffolding"))
+                .filter(f -> !f.getFileName().toString().contains(Properties.SCAFFOLDING_SUFFIX))
                 .filter(SiegeIOHelper::isTestFileEmpty)
                 .collect(Collectors.toList());
         List<Path> filesToDelete = new ArrayList<>();
@@ -81,7 +82,7 @@ public class SiegeIOHelper {
             filesToDelete.add(emptyTestFilePath);
             String testFileName = emptyTestFilePath.toString();
             String testFileBaseName = testFileName.substring(0, testFileName.lastIndexOf("."));
-            String scaffoldingFileName = testFileBaseName + "_scaffolding.java";
+            String scaffoldingFileName = testFileBaseName + "_" + Properties.SCAFFOLDING_SUFFIX + ".java";
             Path scaffoldingFilePath = Paths.get(scaffoldingFileName);
             if (outputFiles.contains(scaffoldingFilePath)) {
                 filesToDelete.add(scaffoldingFilePath);
