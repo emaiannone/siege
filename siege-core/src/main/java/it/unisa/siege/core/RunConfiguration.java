@@ -1,7 +1,6 @@
 package it.unisa.siege.core;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.evosuite.coverage.reachability.ReachabilityTarget;
 
 import java.nio.file.Path;
 import java.util.List;

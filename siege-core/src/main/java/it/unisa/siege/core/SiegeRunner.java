@@ -6,7 +6,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.evosuite.EvoSuite;
 import org.evosuite.Properties;
 import org.evosuite.analysis.StoredStaticPaths;
-import org.evosuite.coverage.reachability.ReachabilityTarget;
 import org.evosuite.coverage.reachability.StaticPath;
 import org.evosuite.result.TestGenerationResult;
 import org.evosuite.testcase.TestChromosome;
@@ -144,8 +143,12 @@ public class SiegeRunner {
         fakeEvoSuite = new EvoSuite();
         LOGGER.info("Analyzing project: {}.", runConfiguration.getProjectPath());
         baseCommands = new ArrayList<>(Arrays.asList(
+                // Asks to evolve test cases, not test suites
                 "-generateTests",
                 "-criterion", Properties.Criterion.REACHABILITY.name(),
+                // DEBUG Ask to generate the initial population that covers all possible methods
+                "-Dtest_factory", Properties.TestFactory.ALLMETHODS.name(),
+                // Enable the extraction of control dependencies (when possible) when building the coverage goal for REACHABILITY criterion
                 "-Dbranch_awareness=true",
                 "-Dalgorithm=" + Properties.Algorithm.STEADY_STATE_GA.name(),
                 "-Dsearch_budget=" + runConfiguration.getBudget(),

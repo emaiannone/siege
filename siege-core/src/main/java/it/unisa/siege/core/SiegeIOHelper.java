@@ -8,7 +8,6 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.evosuite.Properties;
-import org.evosuite.coverage.reachability.ReachabilityTarget;
 
 import java.io.*;
 import java.nio.charset.Charset;

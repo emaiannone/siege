@@ -1,10 +1,10 @@
 package it.unisa.siege.cli;
 
+import it.unisa.siege.core.ReachabilityTarget;
 import it.unisa.siege.core.RunConfiguration;
 import it.unisa.siege.core.SiegeIOHelper;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.tuple.Pair;
-import org.evosuite.coverage.reachability.ReachabilityTarget;
 
 import java.io.IOException;
 import java.nio.file.Files;
