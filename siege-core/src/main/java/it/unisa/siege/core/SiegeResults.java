@@ -67,7 +67,7 @@ public class SiegeResults {
                 } else {
                     // Check if budget is not exhausted and at least one goal was covered
                     result.put(HEADER_OUTCOME, spentBudget < totalBudget && bestFitness == 0 ? OUTCOME_SUCCESS : OUTCOME_FAILED);
-                    LOGGER.info("|-> Reached via {}/{} paths from class '{}'", result.get("exploitedPaths"), result.get("entryPaths"), result.get("clientClass"));
+                    LOGGER.info("|-> Reached from class: '{}'", result.get("clientClass"));
                     LOGGER.info("|-> Using {}/{} seconds, within {} iterations.", result.get("spentBudget"), result.get("totalBudget"), result.get("iterations"));
                 }
                 allResults.add(result);

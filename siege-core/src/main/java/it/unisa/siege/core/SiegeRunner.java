@@ -25,6 +25,7 @@ public class SiegeRunner {
     private static final Logger LOGGER = LoggerFactory.getLogger(SiegeRunner.class);
     private final RunConfiguration runConfiguration;
     private final SiegeResults siegeResults;
+    private final String startTime;
     private EvoSuite fakeEvoSuite;
     private List<String> baseCommands;
     private List<Pair<String, ReachabilityTarget>> targetVulnerabilities;
@@ -32,15 +33,104 @@ public class SiegeRunner {
     private List<String> classpathElements;
     private List<String> clientClasses;
     private File generationLogDir;
+    private File outFileDir;
 
     public SiegeRunner(RunConfiguration runConfiguration) throws Exception {
         this.runConfiguration = runConfiguration;
         this.siegeResults = new SiegeResults();
+        this.startTime = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date());
         preprocess();
     }
 
     public void run() throws Exception {
-        generate();
+        LOGGER.info("Starting the generation session.");
+        LOGGER.info("Generating tests targeting {} vulnerabilities from a pool of {} client classes.", targetVulnerabilities.size(), clientClasses.size());
+        LOGGER.debug("Vulnerabilities ({}): {}", targetVulnerabilities.size(), targetVulnerabilities);
+        LOGGER.debug("Client classes ({}): {}", clientClasses.size(), clientClasses);
+        for (int idx = 0; idx < targetVulnerabilities.size(); idx++) {
+            Pair<String, ReachabilityTarget> vulnerability = targetVulnerabilities.get(idx);
+            LOGGER.info("({}/{}) Generating tests for: {}", idx + 1, targetVulnerabilities.size(), vulnerability.getLeft());
+            List<String> baseCommandsExtended = new ArrayList<>(baseCommands);
+            // Must necessarily replace hyphens with underscores to avoid errors while compiling the tests
+            baseCommandsExtended.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
+            baseCommandsExtended.add("-Dsiege_target_class=" + vulnerability.getRight().getTargetClass());
+            baseCommandsExtended.add("-Dsiege_target_method=" + vulnerability.getRight().getTargetMethod());
+
+            LOGGER.info("Doing a fake EvoSuite run to collect static paths to: {}", vulnerability.getRight());
+            List<String> fakeEvoSuiteCommands = new ArrayList<>(baseCommandsExtended);
+            fakeEvoSuiteCommands.add("-class");
+            fakeEvoSuiteCommands.add(clientClasses.get(0));
+
+            /* DEBUG
+            File fakeGenerationLogFile = null;
+            if (generationLogDir != null && generationLogDir.exists()) {
+                fakeGenerationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", allClientClasses.get(0).substring(allClientClasses.get(0).lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
+                try {
+                    if (fakeGenerationLogFile.createNewFile()) {
+                        LOGGER.info("Writing the generation log in file {}.", fakeGenerationLogFile);
+                    }
+                } catch (IOException e) {
+                    LOGGER.warn("Failed to create the generation log file. No generation log will be written for this run.");
+                }
+            }
+            fakeEvoSuiteCommands.add("-Dsiege_log_file=" + (fakeGenerationLogFile != null ? fakeGenerationLogFile : ""));
+            */
+
+            fakeEvoSuite.parseCommandLine(fakeEvoSuiteCommands.toArray(new String[0]));
+            FileUtils.deleteDirectory(runConfiguration.getTestsDirPath().toFile());
+            // NOTE If keeping the Map in StoredStaticPaths does not scale, just store the static paths for the current reachability target
+            Set<StaticPath> staticPaths = StoredStaticPaths.getStaticPathsToTarget(vulnerability.getRight().getTargetClass(), vulnerability.getRight().getTargetMethod());
+            LOGGER.info("Found {} static paths that could reach: {}.", staticPaths.size(), vulnerability.getRight());
+            LOGGER.debug("Static paths to target ({}): {}", staticPaths.size(), staticPaths);
+            if (staticPaths.isEmpty()) {
+                LOGGER.warn("No client classes seem to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
+                continue;
+            }
+
+            // TODO Make another EntryPointFinder class that prioritize using a measure of probability of exploitation (heuristic-based). The EntryPointFinder type is selected with a CLI option and a factory
+            // This method gives higher priority to the classes near the root.
+            List<String> entryPoints = new RootProximityEntryPointFinder().findEntryPoints(clientClasses, staticPaths);
+            if (entryPoints.isEmpty()) {
+                LOGGER.warn("No client classes seems to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
+                continue;
+            }
+            LOGGER.info("{} client classes could expose to vulnerability {}.", entryPoints.size(), vulnerability.getLeft());
+            LOGGER.debug("Entry point client classes ({}): {}", entryPoints.size(), entryPoints);
+            for (String entryPoint : entryPoints) {
+                LOGGER.info("Starting the generation from class: {}", entryPoint);
+                // Create the generation logging file for this run
+                File generationLogFile = null;
+                if (generationLogDir != null && generationLogDir.exists()) {
+                    generationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", entryPoint.substring(entryPoint.lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
+                    try {
+                        if (generationLogFile.createNewFile()) {
+                            LOGGER.info("Writing the generation log in file: {}.", generationLogFile);
+                        }
+                    } catch (IOException e) {
+                        LOGGER.warn("Failed to create the generation log file. No generation log will be written for this run.");
+                    }
+                }
+                List<String> evoSuiteCommands = new ArrayList<>(baseCommandsExtended);
+                evoSuiteCommands.add("-Dsiege_log_file=" + (generationLogFile != null ? generationLogFile : ""));
+                evoSuiteCommands.add("-class");
+                evoSuiteCommands.add(entryPoint);
+                List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
+                try {
+                    evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
+                            new EvoSuite().parseCommandLine(evoSuiteCommands.toArray(new String[0]));
+                } catch (Exception e) {
+                    // Log and go to next iteration
+                    LOGGER.warn("A problem occurred while generating exploits with {}. Skipping it.", entryPoint);
+                    LOGGER.error(ExceptionUtils.getStackTrace(e));
+                    continue;
+                }
+                if (!runConfiguration.isKeepEmptyTests()) {
+                    SiegeIOHelper.deleteEmptyTestFiles(runConfiguration.getTestsDirPath());
+                }
+                siegeResults.addResults(vulnerability.getLeft(), evoSuiteResults);
+                export();
+            }
+        }
     }
 
     private void preprocess() throws Exception {
@@ -140,7 +230,7 @@ public class SiegeRunner {
             }
         }
         if (generationLogBaseDir != null) {
-            generationLogDir = Paths.get(generationLogBaseDir.getCanonicalPath(), new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date())).toFile();
+            generationLogDir = Paths.get(generationLogBaseDir.getCanonicalPath(), startTime).toFile();
             if (!generationLogDir.exists()) {
                 if (generationLogDir.mkdirs()) {
                     LOGGER.info("Writing the generation log in directory {}.", generationLogDir.getCanonicalPath());
@@ -151,112 +241,30 @@ public class SiegeRunner {
                 LOGGER.info("Writing the generation log in directory {}.", generationLogDir.getCanonicalPath());
             }
         }
+        if (runConfiguration.getOutFilePath() != null) {
+            outFileDir = Paths.get(runConfiguration.getOutFilePath().getParent().toString(), startTime).toFile();
+            if (!outFileDir.exists()) {
+                if (outFileDir.mkdirs()) {
+                    LOGGER.info("Writing the results in directory {}.", outFileDir.getCanonicalPath());
+                } else {
+                    LOGGER.warn("Failed to create the results directory. The results will be printed to stdout.");
+                }
+            } else {
+                LOGGER.info("Writing the results in directory {}.", outFileDir.getCanonicalPath());
+            }
+        }
         LOGGER.info("Using {} seconds budget.", runConfiguration.getBudget());
         LOGGER.info("Evolving populations of {} individuals.", runConfiguration.getPopulationSize());
         LOGGER.info("Writing tests in directory {}.", runConfiguration.getTestsDirPath().toFile().getCanonicalPath());
     }
 
-    private void generate() throws IOException {
-        LOGGER.info("Starting the generation session.");
-        LOGGER.info("Generating tests targeting {} vulnerabilities from a pool of {} client classes.", targetVulnerabilities.size(), clientClasses.size());
-        LOGGER.debug("Vulnerabilities ({}): {}", targetVulnerabilities.size(), targetVulnerabilities);
-        LOGGER.debug("Client classes ({}): {}", clientClasses.size(), clientClasses);
-        for (int idx = 0; idx < targetVulnerabilities.size(); idx++) {
-            Pair<String, ReachabilityTarget> vulnerability = targetVulnerabilities.get(idx);
-            LOGGER.info("({}/{}) Generating tests for: {}", idx + 1, targetVulnerabilities.size(), vulnerability.getLeft());
-            List<String> baseCommandsExtended = new ArrayList<>(baseCommands);
-            // Must necessarily replace hyphens with underscores to avoid errors while compiling the tests
-            baseCommandsExtended.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
-            baseCommandsExtended.add("-Dsiege_target_class=" + vulnerability.getRight().getTargetClass());
-            baseCommandsExtended.add("-Dsiege_target_method=" + vulnerability.getRight().getTargetMethod());
-
-            LOGGER.info("Doing a fake EvoSuite run to collect static paths to: {}", vulnerability.getRight());
-            List<String> fakeEvoSuiteCommands = new ArrayList<>(baseCommandsExtended);
-            fakeEvoSuiteCommands.add("-class");
-            fakeEvoSuiteCommands.add(clientClasses.get(0));
-
-            /* DEBUG
-            File fakeGenerationLogFile = null;
-            if (generationLogDir != null && generationLogDir.exists()) {
-                fakeGenerationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", allClientClasses.get(0).substring(allClientClasses.get(0).lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
-                try {
-                    if (fakeGenerationLogFile.createNewFile()) {
-                        LOGGER.info("Writing the generation log in file {}.", fakeGenerationLogFile);
-                    }
-                } catch (IOException e) {
-                    LOGGER.warn("Failed to create the generation log file. No generation log will be written for this run.");
-                }
-            }
-            fakeEvoSuiteCommands.add("-Dsiege_log_file=" + (fakeGenerationLogFile != null ? fakeGenerationLogFile : ""));
-            */
-
-            fakeEvoSuite.parseCommandLine(fakeEvoSuiteCommands.toArray(new String[0]));
-            FileUtils.deleteDirectory(runConfiguration.getTestsDirPath().toFile());
-            // NOTE If keeping the Map in StoredStaticPaths does not scale, just store the static paths for the current reachability target
-            Set<StaticPath> staticPaths = StoredStaticPaths.getStaticPathsToTarget(vulnerability.getRight().getTargetClass(), vulnerability.getRight().getTargetMethod());
-            LOGGER.info("Found {} static paths that could reach: {}.", staticPaths.size(), vulnerability.getRight());
-            LOGGER.debug("Static paths to target ({}): {}", staticPaths.size(), staticPaths);
-            if (staticPaths.isEmpty()) {
-                LOGGER.warn("No client classes seem to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
-                continue;
-            }
-
-            // TODO Make another EntryPointFinder class that prioritize using a measure of probability of exploitation (heuristic-based). The EntryPointFinder type is selected with a CLI option and a factory
-            // This method gives higher priority to the classes near the root.
-            List<String> entryPoints = new RootProximityEntryPointFinder().findEntryPoints(clientClasses, staticPaths);
-            if (entryPoints.isEmpty()) {
-                LOGGER.warn("No client classes seems to reach vulnerability {}. Generation will not start.", vulnerability.getLeft());
-                continue;
-            }
-            LOGGER.info("{} client classes could expose to vulnerability {}.", entryPoints.size(), vulnerability.getLeft());
-            LOGGER.debug("Entry point client classes ({}): {}", entryPoints.size(), entryPoints);
-            for (String entryPoint : entryPoints) {
-                LOGGER.info("Starting the generation from class: {}", entryPoint);
-                // Create the generation logging file for this run
-                File generationLogFile = null;
-                if (generationLogDir != null && generationLogDir.exists()) {
-                    generationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", entryPoint.substring(entryPoint.lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
-                    try {
-                        if (generationLogFile.createNewFile()) {
-                            LOGGER.info("Writing the generation log in file: {}.", generationLogFile);
-                        }
-                    } catch (IOException e) {
-                        LOGGER.warn("Failed to create the generation log file. No generation log will be written for this run.");
-                    }
-                }
-                List<String> evoSuiteCommands = new ArrayList<>(baseCommandsExtended);
-                evoSuiteCommands.add("-Dsiege_log_file=" + (generationLogFile != null ? generationLogFile : ""));
-                evoSuiteCommands.add("-class");
-                evoSuiteCommands.add(entryPoint);
-                List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
-                try {
-                    evoSuiteResults = (List<List<TestGenerationResult<TestChromosome>>>)
-                            new EvoSuite().parseCommandLine(evoSuiteCommands.toArray(new String[0]));
-                } catch (Exception e) {
-                    // Log and go to next iteration
-                    LOGGER.warn("A problem occurred while generating exploits with {}. Skipping it.", entryPoint);
-                    LOGGER.error(ExceptionUtils.getStackTrace(e));
-                    continue;
-                }
-                if (!runConfiguration.isKeepEmptyTests()) {
-                    SiegeIOHelper.deleteEmptyTestFiles(runConfiguration.getTestsDirPath());
-                }
-                siegeResults.addResults(vulnerability.getLeft(), evoSuiteResults);
-                export();
-            }
-        }
-    }
-
     private void export() {
         // Export time
-        Path outFilePath = runConfiguration.getOutFilePath();
         List<Map<String, String>> resultsToExport = siegeResults.export();
         try {
-            if (outFilePath != null) {
-                SiegeIOHelper.writeToCsv(outFilePath, resultsToExport);
-            }
+            Path outFilePath = Paths.get(outFileDir.getCanonicalPath(), runConfiguration.getOutFilePath().getFileName().toString());
+            SiegeIOHelper.writeToCsv(outFilePath, resultsToExport);
         } catch (IOException e) {
-            LOGGER.error("Failed to export the results on file {}. Printing on stdout instead.", outFilePath);
             LOGGER.error("\t* {}", ExceptionUtils.getStackTrace(e));
             LOGGER.info(String.valueOf(resultsToExport));
         }
