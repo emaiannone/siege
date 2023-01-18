@@ -30,6 +30,8 @@ dependency-reduced-pom.xml
 *.ipr
 *.iws
 
+siege-cli/target/
+
 *SiegeTest.java
 *SiegeTest_scaffolding.java
 evosuite-report/
