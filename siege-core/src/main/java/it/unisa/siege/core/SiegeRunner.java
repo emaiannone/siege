@@ -52,8 +52,8 @@ public class SiegeRunner {
             List<String> baseCommandsExtended = new ArrayList<>(baseCommands);
             // Must necessarily replace hyphens with underscores to avoid errors while compiling the tests
             baseCommandsExtended.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
-            baseCommandsExtended.add("-Dsiege_target_class=" + vulnerability.getRight().getTargetClass());
-            baseCommandsExtended.add("-Dsiege_target_method=" + vulnerability.getRight().getTargetMethod());
+            baseCommandsExtended.add("-Dreachability_target_class=" + vulnerability.getRight().getTargetClass());
+            baseCommandsExtended.add("-Dreachability_target_method=" + vulnerability.getRight().getTargetMethod());
 
             LOGGER.info("Doing a fake EvoSuite run to collect static paths to: {}", vulnerability.getRight());
             List<String> fakeEvoSuiteCommands = new ArrayList<>(baseCommandsExtended);
@@ -78,7 +78,7 @@ public class SiegeRunner {
             fakeEvoSuite.parseCommandLine(fakeEvoSuiteCommands.toArray(new String[0]));
             FileUtils.deleteDirectory(runConfiguration.getTestsDirPath().toFile());
             // NOTE If keeping the Map in StoredStaticPaths does not scale, just store the static paths for the current reachability target
-            Set<StaticPath> staticPaths = StoredStaticPaths.getStaticPathsToTarget(vulnerability.getRight().getTargetClass(), vulnerability.getRight().getTargetMethod());
+            Set<StaticPath> staticPaths = StoredStaticPaths.getPathsToTarget(vulnerability.getRight().getTargetClass(), vulnerability.getRight().getTargetMethod());
             LOGGER.info("Found {} static paths that could reach: {}.", staticPaths.size(), vulnerability.getRight());
             LOGGER.debug("Static paths to target ({}): {}", staticPaths.size(), staticPaths);
             if (staticPaths.isEmpty()) {
@@ -145,29 +145,35 @@ public class SiegeRunner {
         baseCommands = new ArrayList<>(Arrays.asList(
                 // Asks to evolve test cases, not test suites
                 "-generateTests",
+                // Asks to reach a specific class-method pair in any class in the classpath (e.g., a library)
                 "-criterion", Properties.Criterion.REACHABILITY.name(),
-                // DEBUG Ask to generate the initial population that covers all possible methods
-                "-Dtest_factory", Properties.TestFactory.ALLMETHODS.name(),
+                // Asks to generate the initial test cases with a method that approaches to the Siege target, based on the static paths founds
+                "-Dtest_factory", Properties.TestFactory.METHOD_APPROACHING.name(),
                 // Enable the extraction of control dependencies (when possible) when building the coverage goal for REACHABILITY criterion
                 "-Dbranch_awareness=true",
-                "-Dalgorithm=" + Properties.Algorithm.STEADY_STATE_GA.name(),
-                "-Dsearch_budget=" + runConfiguration.getBudget(),
-                "-Dpopulation=" + runConfiguration.getPopulationSize(),
+                // Intrumentation options required by Siege, should not be touched
                 "-Dinstrument_parent=false", // If this is true it seems to give problem to RMI
                 "-Dinstrument_context=true",
                 "-Dinstrument_method_calls=true",
                 "-Dinstrument_libraries=true",
-                "-Dinstrument_target_callers=false", // TODO Takes long time, to be tested again
+                "-Dinstrument_target_callers=false", // TODO This takes long time, should be tested again as it should increase the number of control dependencies found
+                // Search operators, can be modified and expect different performance
+                "-Dalgorithm=" + Properties.Algorithm.STEADY_STATE_GA.name(),
+                "-Dsearch_budget=" + runConfiguration.getBudget(),
+                "-Dpopulation=" + runConfiguration.getPopulationSize(),
+                // Siege's tests do not need assertions
                 "-Dassertions=false",
                 //"-Dcarve_object_pool=true",
                 //"-Dchop_carved_exceptions=false",
+                // We run a test minimization at the end of the generation that should reduce the best test length
                 "-Dminimize=true",
+                // Needed to receive all the info from the RMI client at the end of the generation
                 "-Dserialize_ga=true",
                 "-Dserialize_result=true",
                 "-Dcoverage=false",
                 "-Dprint_covered_goals=true",
                 "-Dprint_missed_goals=true",
-                //"-Dshow_progress=false",
+                // Where to export the generated tests
                 "-Dtest_dir=" + runConfiguration.getTestsDirPath()
         ));
 
