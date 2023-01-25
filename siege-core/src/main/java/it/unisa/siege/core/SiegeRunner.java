@@ -163,7 +163,11 @@ public class SiegeRunner {
                 // The initial test cases try to have a method that approaches to the final target, according to the static paths founds
                 "-Dtest_factory", Properties.TestFactory.METHOD_APPROACHING.name(),
                 // This custom crossover function crosses tests using the points where the tests crashed. For tests not crashing, it behaves like an ordinary single point crossover
-                "-Dcrossover_function=" + Properties.CrossoverFunction.CRASH_POINT.name(),
+                "-Dcrossover_function=" + Properties.CrossoverFunction.EXCEPTION_POINT.name(),
+                // We ask if the exception point should be mutated with a higher probability (w/ Poisson Distribution), if the individual was not already replaced by an offspring
+                "-Dexception_point_mutation=true",
+                // We want an increased probability of changing parameters of a method call
+                "-Dp_change_parameter=0.5",
                 // Search operators, can be modified and expect different performance
                 "-Dsearch_budget=" + runConfiguration.getBudget(),
                 "-Dpopulation=" + runConfiguration.getPopulationSize(),
