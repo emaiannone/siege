@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 
 public class SiegeRunner {
     private static final Logger LOGGER = LoggerFactory.getLogger(SiegeRunner.class);
+    private static final String DATE_FORMAT = "yyyy_MM_dd_HH_mm_ss";
     private final RunConfiguration runConfiguration;
     private final SiegeResults siegeResults;
     private final String startTime;
@@ -37,12 +38,12 @@ public class SiegeRunner {
     public SiegeRunner(RunConfiguration runConfiguration) throws Exception {
         this.runConfiguration = runConfiguration;
         this.siegeResults = new SiegeResults();
-        this.startTime = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date());
+        this.startTime = new SimpleDateFormat(DATE_FORMAT).format(new Date());
         preprocess();
     }
 
     public void run() throws Exception {
-        LOGGER.info("Starting the generation session.");
+        LOGGER.info("Starting Siege at: {}.", startTime);
         LOGGER.info("Generating tests targeting {} vulnerabilities from a pool of {} client classes.", targetVulnerabilities.size(), clientClasses.size());
         LOGGER.debug("Vulnerabilities ({}): {}", targetVulnerabilities.size(), targetVulnerabilities);
         LOGGER.debug("Client classes ({}): {}", clientClasses.size(), clientClasses);
@@ -72,7 +73,7 @@ public class SiegeRunner {
                     LOGGER.warn("Failed to create the generation log file. No generation log will be written for this run.");
                 }
             }
-            fakeEvoSuiteCommands.add("-Dsiege_log_file=" + (fakeGenerationLogFile != null ? fakeGenerationLogFile : ""));
+            fakeEvoSuiteCommands.add("-Dgeneration_log_file=" + (fakeGenerationLogFile != null ? fakeGenerationLogFile : ""));
             */
 
             fakeEvoSuite.parseCommandLine(fakeEvoSuiteCommands.toArray(new String[0]));
@@ -110,7 +111,7 @@ public class SiegeRunner {
                     }
                 }
                 List<String> evoSuiteCommands = new ArrayList<>(baseCommandsExtended);
-                evoSuiteCommands.add("-Dsiege_log_file=" + (generationLogFile != null ? generationLogFile : ""));
+                evoSuiteCommands.add("-Dgeneration_log_file=" + (generationLogFile != null ? generationLogFile : ""));
                 evoSuiteCommands.add("-class");
                 evoSuiteCommands.add(entryPoint);
                 List<List<TestGenerationResult<TestChromosome>>> evoSuiteResults;
@@ -130,6 +131,8 @@ public class SiegeRunner {
                 export();
             }
         }
+        String endTime = new SimpleDateFormat(DATE_FORMAT).format(new Date());
+        LOGGER.info("Terminating Siege at: {}.", endTime);
     }
 
     private void preprocess() throws Exception {
@@ -143,12 +146,10 @@ public class SiegeRunner {
         fakeEvoSuite = new EvoSuite();
         LOGGER.info("Analyzing project: {}.", runConfiguration.getProjectPath());
         baseCommands = new ArrayList<>(Arrays.asList(
-                // Asks to evolve test cases, not test suites
-                "-generateTests",
                 // Asks to reach a specific class-method pair in any class in the classpath (e.g., a library)
                 "-criterion", Properties.Criterion.REACHABILITY.name(),
-                // Asks to generate the initial test cases with a method that approaches to the Siege target, based on the static paths founds
-                "-Dtest_factory", Properties.TestFactory.METHOD_APPROACHING.name(),
+                // Asks to evolve test cases, not test suites
+                "-generateTests",
                 // Enable the extraction of control dependencies (when possible) when building the coverage goal for REACHABILITY criterion
                 "-Dbranch_awareness=true",
                 // Intrumentation options required by Siege, should not be touched
@@ -157,8 +158,13 @@ public class SiegeRunner {
                 "-Dinstrument_method_calls=true",
                 "-Dinstrument_libraries=true",
                 "-Dinstrument_target_callers=false", // TODO This takes long time, should be tested again as it should increase the number of control dependencies found
-                // Search operators, can be modified and expect different performance
+                // We use the Steady State GA as runner
                 "-Dalgorithm=" + Properties.Algorithm.STEADY_STATE_GA.name(),
+                // The initial test cases try to have a method that approaches to the final target, according to the static paths founds
+                "-Dtest_factory", Properties.TestFactory.METHOD_APPROACHING.name(),
+                // This custom crossover function crosses tests using the points where the tests crashed. For tests not crashing, it behaves like an ordinary single point crossover
+                "-Dcrossover_function=" + Properties.CrossoverFunction.CRASH_POINT.name(),
+                // Search operators, can be modified and expect different performance
                 "-Dsearch_budget=" + runConfiguration.getBudget(),
                 "-Dpopulation=" + runConfiguration.getPopulationSize(),
                 // Siege's tests do not need assertions
