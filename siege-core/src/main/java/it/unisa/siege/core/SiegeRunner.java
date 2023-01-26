@@ -151,7 +151,11 @@ public class SiegeRunner {
                 // Asks to evolve test cases, not test suites
                 "-generateTests",
                 // Enable the extraction of control dependencies (when possible) when building the coverage goal for REACHABILITY criterion
-                "-Dbranch_awareness=true",
+                "-Dreachability_branch_awareness=true",
+                // The initial test cases try to have a method that approaches to the final target (according to the static paths founds)
+                "-Dtest_factory", Properties.TestFactory.REACHABILITY_METHOD_APPROACHING.name(),
+                // The crossover and mutations will try to add a method that approaches to the final target (according to the static paths founds) if lost during the transformation
+                "-Dreachability_method_approaching_preservation=true",
                 // Intrumentation options required by Siege, should not be touched
                 "-Dinstrument_parent=false", // If this is true it seems to give problem to RMI
                 "-Dinstrument_context=true",
@@ -160,8 +164,6 @@ public class SiegeRunner {
                 "-Dinstrument_target_callers=false", // TODO This takes long time, should be tested again as it should increase the number of control dependencies found
                 // We use the Steady State GA as runner
                 "-Dalgorithm=" + Properties.Algorithm.STEADY_STATE_GA.name(),
-                // The initial test cases try to have a method that approaches to the final target, according to the static paths founds
-                "-Dtest_factory", Properties.TestFactory.METHOD_APPROACHING.name(),
                 // This custom crossover function crosses tests using the points where the tests crashed. For tests not crashing, it behaves like an ordinary single point crossover
                 "-Dcrossover_function=" + Properties.CrossoverFunction.EXCEPTION_POINT.name(),
                 // We ask if the exception point should be mutated with a higher probability (w/ Poisson Distribution), if the individual was not already replaced by an offspring
