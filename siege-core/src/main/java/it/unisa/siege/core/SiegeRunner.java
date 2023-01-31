@@ -55,26 +55,11 @@ public class SiegeRunner {
             baseCommandsExtended.add("-Djunit_suffix=" + "_" + vulnerability.getLeft().replace("-", "_") + "_SiegeTest");
             baseCommandsExtended.add("-Dreachability_target_class=" + vulnerability.getRight().getTargetClass());
             baseCommandsExtended.add("-Dreachability_target_method=" + vulnerability.getRight().getTargetMethod());
-
-            LOGGER.info("Doing a fake EvoSuite run to collect static paths to: {}", vulnerability.getRight());
+            LOGGER.info("Collecting static paths to: {}", vulnerability.getRight());
+            LOGGER.debug("Preparing the fake EvoSuite run");
             List<String> fakeEvoSuiteCommands = new ArrayList<>(baseCommandsExtended);
             fakeEvoSuiteCommands.add("-class");
             fakeEvoSuiteCommands.add(clientClasses.get(0));
-
-            /* DEBUG
-            File fakeGenerationLogFile = null;
-            if (generationLogDir != null && generationLogDir.exists()) {
-                fakeGenerationLogFile = Paths.get(generationLogDir.getCanonicalPath(), String.format("%s_%s.log", allClientClasses.get(0).substring(allClientClasses.get(0).lastIndexOf(".") + 1), vulnerability.getLeft())).toFile();
-                try {
-                    if (fakeGenerationLogFile.createNewFile()) {
-                        LOGGER.info("Writing the generation log in file {}.", fakeGenerationLogFile);
-                    }
-                } catch (IOException e) {
-                    LOGGER.warn("Failed to create the generation log file. No generation log will be written for this run.");
-                }
-            }
-            fakeEvoSuiteCommands.add("-Dgeneration_log_file=" + (fakeGenerationLogFile != null ? fakeGenerationLogFile : ""));
-            */
 
             fakeEvoSuite.parseCommandLine(fakeEvoSuiteCommands.toArray(new String[0]));
             FileUtils.deleteDirectory(runConfiguration.getTestsDirPath().toFile());
@@ -165,7 +150,7 @@ public class SiegeRunner {
                 // We use the Steady State GA as runner
                 "-Dalgorithm=" + Properties.Algorithm.STEADY_STATE_GA.name(),
                 // This custom crossover function crosses tests using the points where the tests crashed. For tests not crashing, it behaves like an ordinary single point crossover
-                "-Dcrossover_function=" + Properties.CrossoverFunction.EXCEPTION_POINT.name(),
+                "-Dcrossover_function=" + Properties.CrossoverFunction.REACHABILITY_SPECIFIC.name(),
                 // We ask if the exception point should be mutated with a higher probability (w/ Poisson Distribution), if the individual was not already replaced by an offspring
                 "-Dexception_point_mutation=true",
                 // We want an increased probability of changing parameters of a method call
@@ -175,8 +160,14 @@ public class SiegeRunner {
                 "-Dpopulation=" + runConfiguration.getPopulationSize(),
                 // Siege's tests do not need assertions
                 "-Dassertions=false",
-                //"-Dcarve_object_pool=true",
-                //"-Dchop_carved_exceptions=false",
+                // Allowing maximum length to strings to use in tests
+                "-Dstring_length=32767",
+                "-Dmax_string=32767",
+                // High probability of sampling primitives from the constant pool
+                "-Dprimitive_pool=0.95",
+                // Use only the static pool, i.e., the pool of constants carved statically
+                "-Ddynamic_pool=0.0",
+                "-Dreachability_seed_from_goals=true",
                 // We run a test minimization at the end of the generation that should reduce the best test length
                 "-Dminimize=true",
                 // Needed to receive all the info from the RMI client at the end of the generation
