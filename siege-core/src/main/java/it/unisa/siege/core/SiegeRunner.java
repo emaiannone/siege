@@ -139,6 +139,9 @@ public class SiegeRunner {
                 "-Dreachability_branch_awareness=true",
                 // The initial test cases try to have a method that approaches to the final target (according to the static paths founds)
                 "-Dtest_factory", Properties.TestFactory.REACHABILITY_ENTRY_METHOD.name(),
+                "-Dchromosome_length=100",
+                // Probability of adding calls before the entry method
+                "-Dp_add_calls_before_entry_method=0.5",
                 // The crossover and mutations will try to add a method that approaches to the final target (according to the static paths founds) if lost during the transformation
                 "-Dreachability_entry_method_preservation=true",
                 // Intrumentation options required by Siege, should not be touched
