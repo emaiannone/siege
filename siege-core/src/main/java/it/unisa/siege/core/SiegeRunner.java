@@ -135,13 +135,24 @@ public class SiegeRunner {
                 "-criterion", Properties.Criterion.REACHABILITY.name(),
                 // Asks to evolve test cases, not test suites
                 "-generateTests",
-                // Enable the extraction of control dependencies (when possible) when building the coverage goal for REACHABILITY criterion
+                // Enable the extraction of control dependencies (when possible) when building the coverage goals for REACHABILITY criterion
                 "-Dreachability_branch_awareness=true",
                 // The initial test cases try to have a method that approaches to the final target (according to the static paths founds)
                 "-Dtest_factory", Properties.TestFactory.REACHABILITY_ENTRY_METHOD.name(),
                 "-Dchromosome_length=100",
                 // Probability of adding calls before the entry method
                 "-Dp_add_calls_before_entry_method=0.5",
+                // Allowing maximum length to strings to use in tests
+                "-Dstring_length=32767",
+                "-Dmax_string=32767",
+                // High probability of sampling primitives from a constant pool
+                "-Dprimitive_pool=0.95",
+                // Use only the static pool, i.e., the pool of constants carved statically
+                "-Ddynamic_pool=0.0",
+                // Seed constants from methods or branches from coverage goals of REACHABILITY criterion. If "methods" is active, it has the precedence over "branches". Set both as false to use the ordinary EvoSuite pool
+                "-Dreachability_seed_from_methods_in_goals=true",
+                "-Dreachability_seed_from_branches_in_goals=true",
+                // TODO To be removed, as it is guaranteed to have it, not an option
                 // The crossover and mutations will try to add a method that approaches to the final target (according to the static paths founds) if lost during the transformation
                 "-Dreachability_entry_method_preservation=true",
                 // Intrumentation options required by Siege, should not be touched
@@ -163,14 +174,6 @@ public class SiegeRunner {
                 "-Dpopulation=" + runConfiguration.getPopulationSize(),
                 // Siege's tests do not need assertions
                 "-Dassertions=false",
-                // Allowing maximum length to strings to use in tests
-                "-Dstring_length=32767",
-                "-Dmax_string=32767",
-                // High probability of sampling primitives from the constant pool
-                "-Dprimitive_pool=0.95",
-                // Use only the static pool, i.e., the pool of constants carved statically
-                "-Ddynamic_pool=0.0",
-                "-Dreachability_seed_from_goals=true",
                 // We run a test minimization at the end of the generation that should reduce the best test length
                 "-Dminimize=true",
                 // Needed to receive all the info from the RMI client at the end of the generation
