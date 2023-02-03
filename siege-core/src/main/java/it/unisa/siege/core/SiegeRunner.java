@@ -133,14 +133,14 @@ public class SiegeRunner {
         baseCommands = new ArrayList<>(Arrays.asList(
                 // Asks to reach a specific class-method pair in any class in the classpath (e.g., a library)
                 "-criterion", Properties.Criterion.REACHABILITY.name(),
-                // Asks to evolve test cases, not test suites
+                // Asks to evolve test cases long 100 statements, not test suites
                 "-generateTests",
-                // Enable the extraction of control dependencies (when possible) when building the coverage goals for REACHABILITY criterion
-                "-Dreachability_branch_awareness=true",
-                // The initial test cases try to have a method that approaches to the final target (according to the static paths founds)
-                "-Dtest_factory", Properties.TestFactory.REACHABILITY_ENTRY_METHOD.name(),
                 "-Dchromosome_length=100",
-                // Probability of adding calls before the entry method
+                // If enabled, we add the list of control dependencies to solve in the goals for REACHABILITY. The extraction is not always possible for all the classes in the static paths. In that case, the list is empty, and behave like usual. This is done to give more guidance with the fitness function.
+                "-Dreachability_branch_awareness=true",
+                // This enables the use of a new structure of individuals: the initial test cases should have a method that calls the entry method (according to the static paths in the goals)
+                "-Dtest_factory", Properties.TestFactory.REACHABILITY_ENTRY_METHOD.name(),
+                // Probability of adding more calls before calling the entry method
                 "-Dp_add_calls_before_entry_method=0.5",
                 // Allowing maximum length to strings to use in tests
                 "-Dstring_length=32767",
@@ -152,15 +152,6 @@ public class SiegeRunner {
                 // Seed constants from methods or branches from coverage goals of REACHABILITY criterion. If "methods" is active, it has the precedence over "branches". Set both as false to use the ordinary EvoSuite pool
                 "-Dreachability_seed_from_methods_in_goals=true",
                 "-Dreachability_seed_from_branches_in_goals=true",
-                // TODO To be removed, as it is guaranteed to have it, not an option
-                // The crossover and mutations will try to add a method that approaches to the final target (according to the static paths founds) if lost during the transformation
-                "-Dreachability_entry_method_preservation=true",
-                // Intrumentation options required by Siege, should not be touched
-                "-Dinstrument_parent=false", // If this is true it seems to give problem to RMI
-                "-Dinstrument_context=true",
-                "-Dinstrument_method_calls=true",
-                "-Dinstrument_libraries=true",
-                "-Dinstrument_target_callers=false", // TODO This takes long time, should be tested again as it should increase the number of control dependencies found
                 // We use the Steady State GA as runner
                 "-Dalgorithm=" + Properties.Algorithm.STEADY_STATE_GA.name(),
                 // This custom crossover function crosses tests using the points where the tests crashed. For tests not crashing, it behaves like an ordinary single point crossover
@@ -182,25 +173,15 @@ public class SiegeRunner {
                 "-Dcoverage=false",
                 "-Dprint_covered_goals=true",
                 "-Dprint_missed_goals=true",
+                // Various instrumentation options required, so they should not be touched at all
+                "-Dinstrument_parent=false", // If this is true it seems to give problem to RMI
+                "-Dinstrument_context=true",
+                "-Dinstrument_method_calls=true",
+                "-Dinstrument_libraries=true",
+                "-Dinstrument_target_callers=false", // TODO This takes long time, should be tested again as it should increase the number of control dependencies found
                 // Where to export the generated tests
                 "-Dtest_dir=" + runConfiguration.getTestsDirPath()
         ));
-
-        /*
-        List<String> projectDirectories = new ArrayList<>();
-        if (!new File(projectPath.toFile(), "pom.xml").exists()) {
-            projectDirectories.add(projectPath.toString());
-            LOGGER.info("pom.xml file was not found in the target project. Adding {} in the classpath (might miss some .class files).", projectPath);
-        } else {
-            List<String> allMavenOutputDirectory = getAllMavenOutputDirectory(projectPath);
-            if (allMavenOutputDirectory.isEmpty()) {
-                throw new IllegalArgumentException("The target project has no compiled classes: it must be compiled first.");
-            }
-            projectDirectories.addAll(allMavenOutputDirectory);
-            LOGGER.info("The target project is a Maven project with compiled sources. Analyzing .class files in {} directories.", projectDirectories.size());
-            LOGGER.debug("Project directories: {}", projectDirectories);
-        }
-         */
 
         LOGGER.info("Looking for classpath files named: {}.", runConfiguration.getClasspathFileName());
         classpathFiles = BuildHelper.findClasspathFiles(runConfiguration.getProjectPath(), runConfiguration.getClasspathFileName());
