@@ -142,6 +142,9 @@ public class SiegeRunner {
                 "-Dtest_factory", Properties.TestFactory.REACHABILITY_ENTRY_METHOD.name(),
                 // Probability of adding more calls before calling the entry method
                 "-Dp_add_calls_before_entry_method=0.5",
+                // Reduce at minimum the probability of creating new variables, but reuse existing ones
+                "-Dprimitive_reuse_probability=0.95",
+                "-Dobject_reuse_probability=0.95",
                 // Allowing maximum length to strings to use in tests
                 "-Dstring_length=32767",
                 "-Dmax_string=32767",
@@ -155,9 +158,9 @@ public class SiegeRunner {
                 // We use the Steady State GA as runner
                 "-Dalgorithm=" + Properties.Algorithm.STEADY_STATE_GA.name(),
                 // This custom crossover function crosses tests using the points where the tests crashed. For tests not crashing, it behaves like an ordinary single point crossover
-                "-Dcrossover_function=" + Properties.CrossoverFunction.REACHABILITY_SPECIFIC.name(),
+                "-Dcrossover_function=" + Properties.CrossoverFunction.REACHABILITY_ENTRY_METHOD.name(),
                 // We ask if the exception point should be mutated with a higher probability (w/ Poisson Distribution), if the individual was not already replaced by an offspring
-                "-Dexception_point_mutation=true",
+                "-Dexception_point_analysis=true",
                 // We want an increased probability of changing parameters of a method call
                 "-Dp_change_parameter=0.5",
                 // Search operators, can be modified and expect different performance
