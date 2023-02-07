@@ -135,7 +135,8 @@ public class SiegeRunner {
                 "-criterion", Properties.Criterion.REACHABILITY.name(),
                 // Asks to evolve test cases long 100 statements, not test suites
                 "-generateTests",
-                "-Dchromosome_length=100",
+                "-Dchromosome_length=50",
+                "-Dchop_max_length=false",
                 // If enabled, we add the list of control dependencies to solve in the goals for REACHABILITY. The extraction is not always possible for all the classes in the static paths. In that case, the list is empty, and behave like usual. This is done to give more guidance with the fitness function.
                 "-Dreachability_branch_awareness=true",
                 // This enables the use of a new structure of individuals: the initial test cases should have a method that calls the entry method (according to the static paths in the goals)
@@ -161,6 +162,10 @@ public class SiegeRunner {
                 "-Dcrossover_function=" + Properties.CrossoverFunction.REACHABILITY_ENTRY_METHOD.name(),
                 // We ask to use exception points to sample which statements to give priority for crossover or mutation
                 "-Dexception_point_sampling=true",
+                // Use our custom mutation algorithm
+                "-Dreachability_entry_method_mutation=true",
+                // Repair individuals when possible, to force them having the entry method
+                "-Dreachability_entry_method_repair=true",
                 // We want an increased probability of changing parameters of a method call
                 "-Dp_change_parameter=0.5",
                 // Search operators, can be modified and expect different performance
