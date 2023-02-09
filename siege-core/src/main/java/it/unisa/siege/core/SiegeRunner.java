@@ -164,8 +164,6 @@ public class SiegeRunner {
                 "-Dexception_point_sampling=true",
                 // Use our custom mutation algorithm
                 "-Dreachability_entry_method_mutation=true",
-                // Repair individuals when possible, to force them having the entry method
-                "-Dreachability_entry_method_repair=true",
                 // We want an increased probability of changing parameters of a method call
                 "-Dp_change_parameter=0.5",
                 // Search operators, can be modified and expect different performance
