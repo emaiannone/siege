@@ -1,6 +1,6 @@
 package it.unisa.siege.core;
 
-import org.evosuite.coverage.reachability.StaticPath;
+import org.evosuite.utils.StaticPath;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;

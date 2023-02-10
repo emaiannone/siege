@@ -6,9 +6,9 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.evosuite.EvoSuite;
 import org.evosuite.Properties;
 import org.evosuite.analysis.StoredStaticPaths;
-import org.evosuite.coverage.reachability.StaticPath;
 import org.evosuite.result.TestGenerationResult;
 import org.evosuite.testcase.TestChromosome;
+import org.evosuite.utils.StaticPath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
