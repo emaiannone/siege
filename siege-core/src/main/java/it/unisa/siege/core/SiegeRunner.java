@@ -190,7 +190,7 @@ public class SiegeRunner {
         ));
 
         LOGGER.info("Looking for classpath files named: {}.", runConfiguration.getClasspathFileName());
-        classpathFiles = BuildHelper.findClasspathFiles(runConfiguration.getProjectPath(), runConfiguration.getClasspathFileName());
+        classpathFiles = ProjectBuilder.findClasspathFiles(runConfiguration.getProjectPath(), runConfiguration.getClasspathFileName());
         if (classpathFiles.isEmpty()) {
             throw new IllegalArgumentException("No project's classpath file was found.");
         }
@@ -200,13 +200,13 @@ public class SiegeRunner {
         // For each folder where classpath file is found, use Maven to determine the build directory (e.g., target/classes). This solution requires setting the maven.home property. We might find a different solution in the future.
         List<Path> projectDirectories = classpathFiles.stream()
                 .map(Path::getParent)
-                .map(BuildHelper::getMavenOutputDirectory)
+                .map(ProjectBuilder::getMavenOutputDirectory)
                 .filter(Objects::nonNull)
                 .filter(p -> p.toFile().exists())
                 .collect(Collectors.toList());
         LOGGER.debug("Found {} project directories: {}", projectDirectories.size(), projectDirectories);
 
-        classpathElements = BuildHelper.readClasspathFiles(classpathFiles);
+        classpathElements = ProjectBuilder.readClasspathFiles(classpathFiles);
         if (classpathFiles.isEmpty()) {
             throw new IllegalArgumentException("Could not read any project's classpath file.");
         }
@@ -218,7 +218,7 @@ public class SiegeRunner {
                 .map(Path::toString)
                 .forEach(d -> classpathElements.add(0, d));
         String cpString = String.join(":", classpathElements);
-        clientClasses = BuildHelper.findClasses(projectDirectories, cpString);
+        clientClasses = ProjectBuilder.findClasses(projectDirectories, cpString);
         if (clientClasses.isEmpty()) {
             throw new IllegalArgumentException("No client classes were found. No generations can be started.");
         }

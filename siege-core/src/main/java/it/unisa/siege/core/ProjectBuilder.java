@@ -22,7 +22,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class BuildHelper {
+public class ProjectBuilder {
     public static List<Path> findClasspathFiles(Path startDirectory, String classpathFileName) {
         try (Stream<Path> stream = Files.walk(startDirectory)) {
             return stream
