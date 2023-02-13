@@ -1,6 +1,6 @@
 package it.unisa.siege.core.results;
 
-import it.unisa.siege.core.SiegeConfiguration;
+import it.unisa.siege.core.configuration.SiegeConfiguration;
 
 import java.util.ArrayList;
 import java.util.List;

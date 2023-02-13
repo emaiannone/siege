@@ -1,4 +1,4 @@
-package it.unisa.siege.core;
+package it.unisa.siege.core.configuration;
 
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;

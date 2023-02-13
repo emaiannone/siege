@@ -1,5 +1,10 @@
 package it.unisa.siege.core;
 
+import it.unisa.siege.core.configuration.SiegeConfiguration;
+import it.unisa.siege.core.configuration.SiegeConfigurationBuilder;
+import it.unisa.siege.core.configuration.Vulnerability;
+import it.unisa.siege.core.preprocessing.ProjectBuilder;
+import it.unisa.siege.core.preprocessing.RootProximityEntryPointFinder;
 import it.unisa.siege.core.results.GenerationResult;
 import it.unisa.siege.core.results.ProjectResult;
 import it.unisa.siege.core.results.VulnerabilityResult;

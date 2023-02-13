@@ -1,4 +1,4 @@
-package it.unisa.siege.core;
+package it.unisa.siege.core.configuration;
 
 import java.nio.file.Path;
 import java.util.List;

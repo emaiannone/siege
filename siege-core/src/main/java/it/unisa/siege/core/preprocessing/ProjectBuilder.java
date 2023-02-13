@@ -1,4 +1,4 @@
-package it.unisa.siege.core;
+package it.unisa.siege.core.preprocessing;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
