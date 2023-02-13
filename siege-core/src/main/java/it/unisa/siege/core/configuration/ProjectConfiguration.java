@@ -3,7 +3,7 @@ package it.unisa.siege.core.configuration;
 import java.nio.file.Path;
 import java.util.List;
 
-public class SiegeConfiguration {
+public class ProjectConfiguration {
     private Path projectPath;
     private List<Vulnerability> vulnerabilities;
     private int chromosomeLength;
@@ -25,7 +25,7 @@ public class SiegeConfiguration {
     private int searchBudget;
     private int populationSize;
 
-    SiegeConfiguration() {
+    ProjectConfiguration() {
     }
 
     public Path getProjectPath() {

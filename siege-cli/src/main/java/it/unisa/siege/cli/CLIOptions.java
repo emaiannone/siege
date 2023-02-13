@@ -4,6 +4,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 
 public class CLIOptions extends Options {
+    // TODO Add more options based on the things we want to experiment
     public static final String CONFIGURATION_FILE_OPT = "configFile";
     public static final String PROJECT_OPT = "project";
     public static final String CLASSPATH_FILE_NAME_OPT = "classpathFileName";
@@ -11,11 +12,10 @@ public class CLIOptions extends Options {
     public static final String BUDGET_OPT = "budget";
     public static final String POP_SIZE_OPT = "populationSize";
     public static final String TESTS_DIR_OPT = "testsDir";
-    public static final String OUT_FILE_OPT = "outFile";
+    public static final String OUT_DIR_OPT = "outDir";
     public static final String LOG_DIR_OPT = "logDir";
     public static final String KEEP_EMPTY_TESTS_OPT = "keepEmptyTests";
     public static final String HELP_OPT = "help";
-    public static final String TESTS_DIR_DEFAULT = "./siege_tests";
     private static CLIOptions INSTANCE;
 
     private CLIOptions() {
@@ -33,13 +33,6 @@ public class CLIOptions extends Options {
                 .hasArg(true)
                 .desc(String.format("Name of the text files containing the classpath of the project's modules to inspect. This file name is searched within the supplied project directory (via option -%s) recursively. Such files could be automatically obtained by running `mvn dependency:build-classpath` or derived manually.", projectOpt.getOpt()))
                 .build();
-
-        /*
-        Option clientClassOpt = Option.builder(CLIENT_CLASS_OPT)
-                .hasArg(true)
-                .desc(String.format("The fully-qualified name of a specific class to analyze (e.g., org.foo.SomeClassName). The class must be among the .class files found in the supplied project (via option -%s). If not specified, all the classes will be analyzed.", projectOpt.getOpt()))
-                .build();
-         */
 
         Option vulnerabilitiesOpt = Option.builder(VULNERABILITIES_OPT)
                 .hasArg(true)
@@ -61,14 +54,14 @@ public class CLIOptions extends Options {
                 .desc("Path to a directory where the Siege's JUnit test files will be stored.")
                 .build();
 
-        Option outFileOpt = Option.builder(OUT_FILE_OPT)
+        Option outDirOpt = Option.builder(OUT_DIR_OPT)
                 .hasArg(true)
-                .desc("Path to a .csv file where the results will be written. If not specified, the results are printed on the standard output.")
+                .desc("Path to a directory where Siege will store the results. If not specified, the results are printed on the standard output.")
                 .build();
 
         Option logDirOpt = Option.builder(LOG_DIR_OPT)
                 .hasArg(true)
-                .desc("Path to a directory where the detail of the generations will be stored.")
+                .desc("Path to a directory where Siege will store the detail of the generations.")
                 .build();
 
         Option keepEmptyTestsOpt = Option.builder(KEEP_EMPTY_TESTS_OPT)
@@ -88,7 +81,7 @@ public class CLIOptions extends Options {
         addOption(budgetOpt);
         addOption(populationOpt);
         addOption(testsDirOpt);
-        addOption(outFileOpt);
+        addOption(outDirOpt);
         addOption(logDirOpt);
         addOption(keepEmptyTestsOpt);
         addOption(helpOpt);

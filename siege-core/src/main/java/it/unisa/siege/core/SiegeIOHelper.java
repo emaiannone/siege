@@ -17,6 +17,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SiegeIOHelper {
+    private static final String YML = "yml";
+    private static final String YAML = "yaml";
+
     public static void writeToCsv(Path outFilePath, List<Map<String, String>> content) throws IOException {
         writeToCsv(outFilePath.getParent().toString(), outFilePath.getFileName().toString(), content);
     }
@@ -81,5 +84,10 @@ public class SiegeIOHelper {
         } catch (IOException e) {
             return true;
         }
+    }
+
+    public static boolean isYamlFile(File file) {
+        String ext = FilenameUtils.getExtension(file.toPath().toString());
+        return file.isFile() && ext.equalsIgnoreCase(YAML) || ext.equalsIgnoreCase(YML);
     }
 }
