@@ -4,9 +4,9 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 
 public class CLIOptions extends Options {
+    public static final String CONFIGURATION_FILE_OPT = "configFile";
     public static final String PROJECT_OPT = "project";
     public static final String CLASSPATH_FILE_NAME_OPT = "classpathFileName";
-    //public static final String CLIENT_CLASS_OPT = "clientClass";
     public static final String VULNERABILITIES_OPT = "vulnerabilities";
     public static final String BUDGET_OPT = "budget";
     public static final String POP_SIZE_OPT = "populationSize";
@@ -15,12 +15,15 @@ public class CLIOptions extends Options {
     public static final String LOG_DIR_OPT = "logDir";
     public static final String KEEP_EMPTY_TESTS_OPT = "keepEmptyTests";
     public static final String HELP_OPT = "help";
-    public static final int BUDGET_DEFAUlT = 60;
-    public static final int POP_SIZE_DEFAUlT = 100;
     public static final String TESTS_DIR_DEFAULT = "./siege_tests";
     private static CLIOptions INSTANCE;
 
     private CLIOptions() {
+        Option configFileOpt = Option.builder(CONFIGURATION_FILE_OPT)
+                .hasArg(true)
+                .desc("Path to a YAML file containing all the configuration to test. The keys of this file are the same as of the command-line options. If supplied, the other options are used as default.")
+                .build();
+
         Option projectOpt = Option.builder(PROJECT_OPT)
                 .hasArg(true)
                 .desc("Path to the project to inspect. If the path points to the root of a Maven-based project (i.e., where a pom.xml file is located), the inspected classes will be taken from the default output directory (e.g., target/classes) using the locally-installed Maven (hence, the project must be compiled beforehand). Alternatively, the path can also point to a directory with .class files to inspect.")
@@ -45,12 +48,12 @@ public class CLIOptions extends Options {
 
         Option budgetOpt = Option.builder(BUDGET_OPT)
                 .hasArg(true)
-                .desc(String.format("An integer indicating the maximum time budget in seconds given for generating tests for each pair of target and client class. Must be greater than 0. If not specified, it defaults to %s", BUDGET_DEFAUlT))
+                .desc("An integer indicating the maximum time budget in seconds given for generating tests for each pair of target and client class. If invalid, a default value is used.")
                 .build();
 
         Option populationOpt = Option.builder(POP_SIZE_OPT)
                 .hasArg(true)
-                .desc(String.format("An integer indicating the number of test cases in each generation. Must be greater than 1. If not specified, it defaults to %s", POP_SIZE_DEFAUlT))
+                .desc("An integer indicating the number of test cases in each generation. If invalid, a default value is used.")
                 .build();
 
         Option testsDirOpt = Option.builder(TESTS_DIR_OPT)
@@ -78,6 +81,7 @@ public class CLIOptions extends Options {
                 .desc("Show the options available, ignoring all other options used.")
                 .build();
 
+        addOption(configFileOpt);
         addOption(projectOpt);
         addOption(classpathFileNameOpt);
         addOption(vulnerabilitiesOpt);

@@ -1,14 +1,12 @@
 package it.unisa.siege.core;
 
-import org.apache.commons.lang3.tuple.Pair;
-
 import java.nio.file.Path;
-import java.util.List;
 
-public class RunConfiguration {
+public class CLIConfiguration {
+    private final Path configurationFilePath;
     private final Path projectPath;
     private final String classpathFileName;
-    private final List<Pair<String, ReachabilityTarget>> targetVulnerabilities;
+    private final Path vulnerabilitiesFilePath;
     private final int budget;
     private final int populationSize;
     private final Path testsDirPath;
@@ -16,16 +14,21 @@ public class RunConfiguration {
     private final Path logDirPath;
     private final boolean keepEmptyTests;
 
-    public RunConfiguration(Path projectPath, String classpathFileName, List<Pair<String, ReachabilityTarget>> targetVulnerabilities, int budget, int populationSize, Path testsDirPath, Path outFilePath, Path logDirPath, boolean keepEmptyTests) {
+    public CLIConfiguration(Path configurationFilePath, Path projectPath, String classpathFileName, Path vulnerabilitiesFilePath, int budget, int populationSize, Path testsDirPath, Path outFilePath, Path logDirPath, boolean keepEmptyTests) {
+        this.configurationFilePath = configurationFilePath;
         this.projectPath = projectPath;
         this.classpathFileName = classpathFileName;
-        this.targetVulnerabilities = targetVulnerabilities;
+        this.vulnerabilitiesFilePath = vulnerabilitiesFilePath;
         this.budget = budget;
         this.populationSize = populationSize;
         this.testsDirPath = testsDirPath;
         this.outFilePath = outFilePath;
         this.logDirPath = logDirPath;
         this.keepEmptyTests = keepEmptyTests;
+    }
+
+    public Path getConfigurationFilePath() {
+        return configurationFilePath;
     }
 
     public Path getProjectPath() {
@@ -36,8 +39,8 @@ public class RunConfiguration {
         return classpathFileName;
     }
 
-    public List<Pair<String, ReachabilityTarget>> getTargetVulnerabilities() {
-        return targetVulnerabilities;
+    public Path getVulnerabilitiesFilePath() {
+        return vulnerabilitiesFilePath;
     }
 
     public int getBudget() {

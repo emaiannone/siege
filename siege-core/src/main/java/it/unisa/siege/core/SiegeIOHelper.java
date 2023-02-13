@@ -1,12 +1,7 @@
 package it.unisa.siege.core;
 
-import com.opencsv.CSVReader;
-import com.opencsv.CSVReaderBuilder;
-import com.opencsv.exceptions.CsvValidationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.evosuite.Properties;
 
 import java.io.*;
@@ -22,19 +17,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SiegeIOHelper {
-    public static List<Pair<String, ReachabilityTarget>> readAndParseCsv(Path csvFilePath) throws IOException {
-        List<Pair<String, ReachabilityTarget>> vulnerabilityList = new ArrayList<>();
-        try (CSVReader reader = new CSVReaderBuilder(new FileReader(csvFilePath.toFile())).withSkipLines(1).build()) {
-            String[] values;
-            while ((values = reader.readNext()) != null) {
-                vulnerabilityList.add(new ImmutablePair<>(values[0], new ReachabilityTarget(values[2], values[3])));
-            }
-        } catch (CsvValidationException e) {
-            throw new IOException(e);
-        }
-        return vulnerabilityList;
-    }
-
     public static void writeToCsv(Path outFilePath, List<Map<String, String>> content) throws IOException {
         writeToCsv(outFilePath.getParent().toString(), outFilePath.getFileName().toString(), content);
     }
