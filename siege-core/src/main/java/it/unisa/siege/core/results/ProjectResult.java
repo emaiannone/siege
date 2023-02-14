@@ -3,13 +3,14 @@ package it.unisa.siege.core.results;
 import it.unisa.siege.core.configuration.ProjectConfiguration;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class ProjectResult {
     private final ProjectConfiguration projectConfig;
     private final List<VulnerabilityResult> vulnerabilityResults;
-    private String startTime;
-    private String endTime;
+    private Date startTime;
+    private Date endTime;
 
     public ProjectResult(ProjectConfiguration projectConfig) {
         this.projectConfig = projectConfig;
@@ -30,12 +31,11 @@ public class ProjectResult {
         vulnerabilityResults.add(vulnerabilityResult);
     }
 
-    public void setStartTime(String startTime) {
+    public void setStartTime(Date startTime) {
         this.startTime = startTime;
     }
 
-    public void setEndTime(String endTime) {
+    public void setEndTime(Date endTime) {
         this.endTime = endTime;
     }
-
 }

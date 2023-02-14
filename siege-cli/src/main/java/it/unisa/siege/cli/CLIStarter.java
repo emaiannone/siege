@@ -1,7 +1,7 @@
 package it.unisa.siege.cli;
 
-import it.unisa.siege.core.BaseConfiguration;
 import it.unisa.siege.core.SiegeLauncher;
+import it.unisa.siege.core.configuration.BaseConfiguration;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

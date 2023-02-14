@@ -1,14 +1,12 @@
 package it.unisa.siege.core;
 
-import it.unisa.siege.core.configuration.ProjectConfiguration;
-import it.unisa.siege.core.configuration.ProjectConfigurationBuilder;
-import it.unisa.siege.core.configuration.Vulnerability;
-import it.unisa.siege.core.configuration.YAMLConfigurationFileParser;
+import it.unisa.siege.core.configuration.*;
 import it.unisa.siege.core.preprocessing.ProjectBuilder;
 import it.unisa.siege.core.preprocessing.RootProximityEntryPointFinder;
 import it.unisa.siege.core.results.GenerationResult;
 import it.unisa.siege.core.results.ProjectResult;
 import it.unisa.siege.core.results.VulnerabilityResult;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.evosuite.EvoSuite;
@@ -30,7 +28,8 @@ import java.util.stream.Collectors;
 
 public class SiegeLauncher {
     private static final Logger LOGGER = LoggerFactory.getLogger(SiegeLauncher.class);
-    private static final String DATE_FORMAT = "yyyy_MM_dd_HH_mm_ss";
+    private static final String DATE_FORMAT_STDOUT = "dd/MM/yyyy HH:mm:ss";
+    private static final String DATE_FORMAT_FILE = "yyyy_MM_dd_HH_mm_ss";
 
     private static final Path TESTS_DIR_PATH_DEFAULT = Paths.get("./siege_tests");
     private static final Path OUT_DIR_PATH_DEFAULT = Paths.get("./siege_results");
@@ -44,44 +43,60 @@ public class SiegeLauncher {
 
     public SiegeLauncher(BaseConfiguration baseConfig) throws Exception {
         this.baseConfig = baseConfig;
-        String siegeStartTime = new SimpleDateFormat(DATE_FORMAT).format(new Date());
+        Date siegeStartTime = new Date();
         this.projectConfigs = new ArrayList<>();
         String configFile = baseConfig.getConfigurationFile();
         Path configFilePath = configFile != null ? Paths.get(configFile) : null;
         if (configFilePath != null && Files.exists(configFilePath)) {
-            LOGGER.info("Running Siege with configuration file: {}.", configFilePath);
-            LOGGER.info("Unspecified options will be given default values.");
+            if (!SiegeIOHelper.isYamlFile(configFilePath.toFile())) {
+                throw new IOException("The configuration file is not a YAML file.");
+            }
+            LOGGER.info("({}) Running Siege with configuration file: {}.", new SimpleDateFormat(DATE_FORMAT_STDOUT).format(siegeStartTime), configFilePath);
             projectConfigs.addAll(YAMLConfigurationFileParser.parseConfigFile(baseConfig));
         } else {
             LOGGER.info("Running Siege with command-line options.");
-            LOGGER.info("Unspecified options will be given default values.");
-            // TODO Add new CLI options (according to the content of ProjectConfiguration) and send it there
             ProjectConfiguration projectConfig = new ProjectConfigurationBuilder()
-                    .setProjectDir(baseConfig.getProject())
-                    .setVulnerabilitiesFile(baseConfig.getVulnerabilitiesFileName())
-                    .setSearchBudget(baseConfig.getBudget())
-                    .setPopulationSize(baseConfig.getPopSize())
+                    .setProjectDir(baseConfig.getProjectDir())
+                    .setVulnerabilitiesFile(baseConfig.getVulnerabilitiesFile())
+                    .setChromosomeLength(baseConfig.getChromosomeLength())
+                    .setBranchAwareness(baseConfig.isBranchAwareness())
+                    .setMaxStringLength(baseConfig.getMaxStringLength())
+                    .setProbabilityAddCallsBeforeEntryMethod(baseConfig.getProbabilityAddCallsBeforeEntryMethod())
+                    .setProbabilityPrimitiveReuse(baseConfig.getProbabilityPrimitiveReuse())
+                    .setProbabilityPrimitivePool(baseConfig.getProbabilityPrimitivePool())
+                    .setProbabilityObjectReuse(baseConfig.getProbabilityObjectReuse())
+                    .setProbabilityDynamicPool(baseConfig.getProbabilityDynamicPool())
+                    .setProbabilityChangeParameter(baseConfig.getProbabilityChangeParameter())
+                    .setSeedFromMethodsInGoals(baseConfig.isSeedFromMethodsInGoals())
+                    .setSeedFromBranchesInGoals(baseConfig.isSeedFromBranchesInGoals())
+                    .setMetaheuristic(baseConfig.getMetaheuristic())
+                    .setInitialPopulationAlgorithm(baseConfig.getInitialPopulationAlgorithm())
+                    .setCrossover(baseConfig.getCrossover())
+                    .setEntryMethodMutation(baseConfig.isEntryMethodMutation())
+                    .setExceptionPointSampling(baseConfig.isExceptionPointSampling())
+                    .setSearchBudget(baseConfig.getSearchBudget())
+                    .setPopulationSize(baseConfig.getPopulationSize())
                     .build();
             projectConfigs.add(projectConfig);
         }
 
         String testsDir = baseConfig.getTestsDir();
         Path testsDirPath = testsDir != null ? Paths.get(testsDir) : null;
-        baseTestsDirPath = testsDirPath != null ? Paths.get(testsDirPath.toString(), siegeStartTime) : TESTS_DIR_PATH_DEFAULT;
+        baseTestsDirPath = testsDirPath != null ? Paths.get(testsDirPath.toString(), new SimpleDateFormat(DATE_FORMAT_FILE).format(siegeStartTime)) : TESTS_DIR_PATH_DEFAULT;
         if (!Files.exists(baseTestsDirPath)) {
             Files.createDirectories(baseTestsDirPath);
         }
 
         String outDir = baseConfig.getOutDir();
         Path outDirPath = outDir != null ? Paths.get(outDir) : null;
-        baseOutDirPath = outDirPath != null ? Paths.get(outDirPath.toString(), siegeStartTime) : OUT_DIR_PATH_DEFAULT;
+        baseOutDirPath = outDirPath != null ? Paths.get(outDirPath.toString(), new SimpleDateFormat(DATE_FORMAT_FILE).format(siegeStartTime)) : OUT_DIR_PATH_DEFAULT;
         if (!Files.exists(baseOutDirPath)) {
             Files.createDirectories(baseOutDirPath);
         }
 
         String logDir = baseConfig.getLogDir();
         Path logDirPath = logDir != null ? Paths.get(logDir) : null;
-        baseLogDirPath = logDirPath != null ? Paths.get(logDirPath.toString(), siegeStartTime) : LOG_DIR_PATH_DEFAULT;
+        baseLogDirPath = logDirPath != null ? Paths.get(logDirPath.toString(), new SimpleDateFormat(DATE_FORMAT_FILE).format(siegeStartTime)) : LOG_DIR_PATH_DEFAULT;
         if (!Files.exists(baseLogDirPath)) {
             Files.createDirectories(baseLogDirPath);
         }
@@ -99,15 +114,14 @@ public class SiegeLauncher {
 
     private void analyzeProject(ProjectConfiguration projectConfig) throws Exception {
         ProjectResult projectResult = new ProjectResult(projectConfig);
-        String runStartTime = new SimpleDateFormat(DATE_FORMAT).format(new Date());
+        Date runStartTime = new Date();
         projectResult.setStartTime(runStartTime);
-
         List<Vulnerability> vulnerabilities = projectConfig.getVulnerabilities();
         if (vulnerabilities.isEmpty()) {
             LOGGER.info("No vulnerabilities to reach. No generation can be done.");
-            String endTime = new SimpleDateFormat(DATE_FORMAT).format(new Date());
-            LOGGER.info("Terminating Siege run at: {}", endTime);
-            projectResult.setEndTime(endTime);
+            Date runEndTime = new Date();
+            LOGGER.info("Terminating Siege run at: {}", new SimpleDateFormat(DATE_FORMAT_STDOUT).format(runEndTime));
+            projectResult.setEndTime(runEndTime);
             return;
         }
 
@@ -115,7 +129,7 @@ public class SiegeLauncher {
         EvoSuite fakeEvoSuite = new EvoSuite();
         Path projectPath = projectConfig.getProjectPath();
         String projectName = projectPath.getFileName().toString();
-        LOGGER.info("({}) Analyzing project: {}", runStartTime, projectName);
+        LOGGER.info("({}) Analyzing project: {}", new SimpleDateFormat(DATE_FORMAT_STDOUT).format(runStartTime), projectName);
         Pair<String, List<String>> processClasspathRes = ProjectBuilder.processClasspath(projectPath, baseConfig.getClasspathFileName());
         String classpathString = processClasspathRes.getLeft();
         List<String> clientClasses = processClasspathRes.getRight();
@@ -127,10 +141,11 @@ public class SiegeLauncher {
         Path projectTestsDirPath = Paths.get(baseTestsDirPath.toString(), projectName);
         Path projectOutDirPath = Paths.get(baseOutDirPath.toString(), projectName);
         Path projectLogDirPath = Paths.get(baseLogDirPath.toString(), projectName);
-        LOGGER.info("Writing tests in directory {}.", projectTestsDirPath.toFile().getCanonicalPath());
-        LOGGER.info("Writing results in directory {}.", projectOutDirPath.toFile().getCanonicalPath());
-        LOGGER.info("Writing generation log in directory {}.", projectLogDirPath.toFile().getCanonicalPath());
+        LOGGER.info("Writing tests in directory: {}", projectTestsDirPath.toFile().getCanonicalPath());
+        LOGGER.info("Writing results in directory: {}", projectOutDirPath.toFile().getCanonicalPath());
+        LOGGER.info("Writing generation log in directory: {}", projectLogDirPath.toFile().getCanonicalPath());
 
+        // TODO Remove most of these comments
         List<String> baseCommands = new ArrayList<>(Arrays.asList(
                 // Asks to reach a specific class-method pair in any class in the classpath (e.g., a library)
                 "-criterion", Properties.Criterion.REACHABILITY.name(),
@@ -156,9 +171,9 @@ public class SiegeLauncher {
                 "-Dchromosome_length=" + projectConfig.getChromosomeLength(),
                 "-Dchop_max_length=false",
                 // If enabled, we add the list of control dependencies to solve in the goals for REACHABILITY. The extraction is not always possible for all the classes in the static paths. In that case, the list is empty, and behave like usual. This is done to give more guidance with the fitness function.
-                "-Dreachability_branch_awareness=" + projectConfig.isReachabilityBranchAwareness(),
+                "-Dreachability_branch_awareness=" + projectConfig.isBranchAwareness(),
                 // This enables the use of a new structure of individuals: the initial test cases should have a method that calls the entry method (according to the static paths in the goals)
-                "-Dtest_factory=" + projectConfig.getInitialPopulationGenerationAlgorithm(),
+                "-Dtest_factory=" + projectConfig.getInitialPopulationAlgorithm(),
                 // Probability of adding more calls before calling the entry method
                 "-Dp_add_calls_before_entry_method=" + projectConfig.getProbabilityAddCallsBeforeEntryMethod(),
                 // Reduce at minimum the probability of creating new variables, but reuse existing ones
@@ -172,16 +187,16 @@ public class SiegeLauncher {
                 // The probability of using constants carved during test execution (i.e., not those carved statically)
                 "-Ddynamic_pool=" + projectConfig.getProbabilityDynamicPool(),
                 // Seed constants from methods or branches from coverage goals of REACHABILITY criterion. If "methods" is active, it has the precedence over "branches". Set both as false to use the ordinary EvoSuite pool
-                "-Dreachability_seed_from_methods_in_goals=" + projectConfig.isReachabilitySeedFromMethodsInGoals(),
-                "-Dreachability_seed_from_branches_in_goals=" + projectConfig.isReachabilitySeedFromBranchesInGoals(),
+                "-Dreachability_seed_from_methods_in_goals=" + projectConfig.isSeedFromMethodsInGoals(),
+                "-Dreachability_seed_from_branches_in_goals=" + projectConfig.isSeedFromBranchesInGoals(),
                 // We use the Steady State GA as runner
-                "-Dalgorithm=" + projectConfig.getAlgorithm(),
+                "-Dalgorithm=" + projectConfig.getMetaheuristic(),
                 // This custom crossover function crosses tests using the points where the tests crashed. For tests not crashing, it behaves like an ordinary single point crossover
-                "-Dcrossover_function=" + projectConfig.getCrossoverAlgorithm(),
+                "-Dcrossover_function=" + projectConfig.getCrossover(),
                 // We ask to use exception points to sample which statements to give priority for crossover or mutation
                 "-Dexception_point_sampling=" + projectConfig.isExceptionPointSampling(),
                 // Use our custom mutation algorithm
-                "-Dreachability_entry_method_mutation=" + projectConfig.isReachabilityEntryMethodMutation(),
+                "-Dreachability_entry_method_mutation=" + projectConfig.isEntryMethodMutation(),
                 // We want an increased probability of changing parameters of a method call
                 "-Dp_change_parameter=" + projectConfig.getProbabilityChangeParameter(),
                 // Search operators, can be modified and expect different performance
@@ -209,7 +224,7 @@ public class SiegeLauncher {
             fakeEvoSuiteCommands.add("-class");
             fakeEvoSuiteCommands.add(clientClasses.get(0));
             fakeEvoSuite.parseCommandLine(fakeEvoSuiteCommands.toArray(new String[0]));
-            Files.deleteIfExists(projectTestsDirPath);
+            FileUtils.deleteQuietly(projectTestsDirPath.toFile());
             // NOTE If keeping the Map in StoredStaticPaths does not scale, just store the static paths for the current reachability target
             Set<StaticPath> staticPaths = StoredStaticPaths.getPathsToTarget(vulnerability.getTargetClass(), vulnerability.getTargetMethod());
             LOGGER.info("Found {} static paths that could reach: {}.", staticPaths.size(), vulnerability.getTargetClass() + vulnerability.getTargetMethod());
@@ -242,9 +257,9 @@ public class SiegeLauncher {
             }
             projectResult.addVulnerabilityResult(vulnerabilityResult);
         }
-        String endTime = new SimpleDateFormat(DATE_FORMAT).format(new Date());
-        LOGGER.info("Terminating Siege run at: {}", endTime);
-        projectResult.setEndTime(endTime);
+        Date runEndTime = new Date();
+        LOGGER.info("Terminating Siege run at: {}", new SimpleDateFormat(DATE_FORMAT_STDOUT).format(runEndTime));
+        projectResult.setEndTime(runEndTime);
 
         // TODO Export to JSON file into projectOutDirPath. For now, we print for debugging purposes
         System.out.printf("DEBUG: Export to %s%n", projectOutDirPath);

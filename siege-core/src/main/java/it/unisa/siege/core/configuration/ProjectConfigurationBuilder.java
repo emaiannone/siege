@@ -15,31 +15,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ProjectConfigurationBuilder {
-    private static final String PROJECT_DIR_DEFAULT = null;
-    private static final String VULNERABILITIES_FILE_DEFAULT = null;
-    private static final int CHROMOSOME_LENGTH_DEFAULT = 50;
-    private static final boolean REACHABILITY_BRANCH_AWARENESS_DEFAULT = true;
-    private static final int MAX_STRING_LENGTH_DEFAULT = 32767;
-    private static final double PROBABILITY_ADD_CALLS_BEFORE_ENTRY_METHOD_DEFAULT = 0.5;
-    private static final double PROBABILITY_PRIMITIVE_REUSE_DEFAULT = 0.95;
-    private static final double PROBABILITY_PRIMITIVE_POOL_DEFAULT = 0.95;
-    private static final double PROBABILITY_OBJECT_REUSE_DEFAULT = 0.95;
-    private static final double PROBABILITY_DYNAMIC_POOL_DEFAULT = 0.0;
-    private static final double PROBABILITY_CHANGE_PARAMETER_DEFAULT = 0.5;
-    private static final boolean REACHABILITY_SEED_FROM_METHODS_IN_GOALS_DEFAULT = true;
-    private static final boolean REACHABILITY_SEED_FROM_BRANCHES_IN_GOALS_DEFAULT = true;
-    private static final String GA_TYPE_DEFAULT = Properties.Algorithm.STEADY_STATE_GA.name();
-    private static final String INITIAL_POPULATION_GENERATION_ALGORITHM_DEFAULT = Properties.TestFactory.REACHABILITY_ENTRY_METHOD.name();
-    private static final String CROSSOVER_ALGORITHM_DEFAULT = Properties.CrossoverFunction.REACHABILITY_ENTRY_METHOD.name();
-    private static final boolean REACHABILITY_ENTRY_METHOD_MUTATION_DEFAULT = true;
-    private static final boolean EXCEPTION_POINT_SAMPLING_DEFAULT = true;
-    private static final int SEARCH_BUDGET_DEFAULT = 60;
-    private static final int POPULATION_SIZE_DEFAULT = 100;
-
     private String projectDir;
     private String vulnerabilitiesFile;
     private int chromosomeLength;
-    private boolean reachabilityBranchAwareness;
+    private boolean branchAwareness;
     private int maxStringLength;
     private double probabilityAddCallsBeforeEntryMethod;
     private double probabilityPrimitiveReuse;
@@ -47,12 +26,12 @@ public class ProjectConfigurationBuilder {
     private double probabilityObjectReuse;
     private double probabilityDynamicPool;
     private double probabilityChangeParameter;
-    private boolean reachabilitySeedFromMethodsInGoals;
-    private boolean reachabilitySeedFromBranchesInGoals;
-    private String algorithm;
-    private String initialPopulationGenerationAlgorithm;
-    private String crossoverAlgorithm;
-    private boolean reachabilityEntryMethodMutation;
+    private boolean seedFromMethodsInGoals;
+    private boolean seedFromBranchesInGoals;
+    private String metaheuristic;
+    private String initialPopulationAlgorithm;
+    private String crossover;
+    private boolean entryMethodMutation;
     private boolean exceptionPointSampling;
     private int searchBudget;
     private int populationSize;
@@ -62,26 +41,26 @@ public class ProjectConfigurationBuilder {
     }
 
     public void reset() {
-        this.projectDir = PROJECT_DIR_DEFAULT;
-        this.vulnerabilitiesFile = VULNERABILITIES_FILE_DEFAULT;
-        this.chromosomeLength = CHROMOSOME_LENGTH_DEFAULT;
-        this.reachabilityBranchAwareness = REACHABILITY_BRANCH_AWARENESS_DEFAULT;
-        this.maxStringLength = MAX_STRING_LENGTH_DEFAULT;
-        this.probabilityAddCallsBeforeEntryMethod = PROBABILITY_ADD_CALLS_BEFORE_ENTRY_METHOD_DEFAULT;
-        this.probabilityPrimitiveReuse = PROBABILITY_PRIMITIVE_REUSE_DEFAULT;
-        this.probabilityPrimitivePool = PROBABILITY_PRIMITIVE_POOL_DEFAULT;
-        this.probabilityObjectReuse = PROBABILITY_OBJECT_REUSE_DEFAULT;
-        this.probabilityDynamicPool = PROBABILITY_DYNAMIC_POOL_DEFAULT;
-        this.probabilityChangeParameter = PROBABILITY_CHANGE_PARAMETER_DEFAULT;
-        this.reachabilitySeedFromMethodsInGoals = REACHABILITY_SEED_FROM_METHODS_IN_GOALS_DEFAULT;
-        this.reachabilitySeedFromBranchesInGoals = REACHABILITY_SEED_FROM_BRANCHES_IN_GOALS_DEFAULT;
-        this.algorithm = GA_TYPE_DEFAULT;
-        this.initialPopulationGenerationAlgorithm = INITIAL_POPULATION_GENERATION_ALGORITHM_DEFAULT;
-        this.crossoverAlgorithm = CROSSOVER_ALGORITHM_DEFAULT;
-        this.reachabilityEntryMethodMutation = REACHABILITY_ENTRY_METHOD_MUTATION_DEFAULT;
-        this.exceptionPointSampling = EXCEPTION_POINT_SAMPLING_DEFAULT;
-        this.searchBudget = SEARCH_BUDGET_DEFAULT;
-        this.populationSize = POPULATION_SIZE_DEFAULT;
+        this.projectDir = ConfigurationDefaults.PROJECT_DIR_DEFAULT;
+        this.vulnerabilitiesFile = ConfigurationDefaults.VULNERABILITIES_FILE_DEFAULT;
+        this.chromosomeLength = ConfigurationDefaults.CHROMOSOME_LENGTH_DEFAULT;
+        this.branchAwareness = ConfigurationDefaults.BRANCH_AWARENESS_DEFAULT;
+        this.maxStringLength = ConfigurationDefaults.MAX_STRING_LENGTH_DEFAULT;
+        this.probabilityAddCallsBeforeEntryMethod = ConfigurationDefaults.PROBABILITY_ADD_CALLS_BEFORE_ENTRY_METHOD_DEFAULT;
+        this.probabilityPrimitiveReuse = ConfigurationDefaults.PROBABILITY_PRIMITIVE_REUSE_DEFAULT;
+        this.probabilityPrimitivePool = ConfigurationDefaults.PROBABILITY_PRIMITIVE_POOL_DEFAULT;
+        this.probabilityObjectReuse = ConfigurationDefaults.PROBABILITY_OBJECT_REUSE_DEFAULT;
+        this.probabilityDynamicPool = ConfigurationDefaults.PROBABILITY_DYNAMIC_POOL_DEFAULT;
+        this.probabilityChangeParameter = ConfigurationDefaults.PROBABILITY_CHANGE_PARAMETER_DEFAULT;
+        this.seedFromMethodsInGoals = ConfigurationDefaults.SEED_FROM_METHODS_IN_GOALS_DEFAULT;
+        this.seedFromBranchesInGoals = ConfigurationDefaults.SEED_FROM_BRANCHES_IN_GOALS_DEFAULT;
+        this.metaheuristic = ConfigurationDefaults.METAHEURISTIC_DEFAULT;
+        this.initialPopulationAlgorithm = ConfigurationDefaults.INITIAL_POPULATION_ALGORITHM_DEFAULT;
+        this.crossover = ConfigurationDefaults.CROSSOVER_ALGORITHM_DEFAULT;
+        this.entryMethodMutation = ConfigurationDefaults.ENTRY_METHOD_MUTATION_DEFAULT;
+        this.exceptionPointSampling = ConfigurationDefaults.EXCEPTION_POINT_SAMPLING_DEFAULT;
+        this.searchBudget = ConfigurationDefaults.SEARCH_BUDGET_DEFAULT;
+        this.populationSize = ConfigurationDefaults.POPULATION_SIZE_DEFAULT;
     }
 
     public ProjectConfigurationBuilder setProjectDir(String projectDir) {
@@ -99,8 +78,8 @@ public class ProjectConfigurationBuilder {
         return this;
     }
 
-    public ProjectConfigurationBuilder setReachabilityBranchAwareness(boolean reachabilityBranchAwareness) {
-        this.reachabilityBranchAwareness = reachabilityBranchAwareness;
+    public ProjectConfigurationBuilder setBranchAwareness(boolean branchAwareness) {
+        this.branchAwareness = branchAwareness;
         return this;
     }
 
@@ -139,33 +118,33 @@ public class ProjectConfigurationBuilder {
         return this;
     }
 
-    public ProjectConfigurationBuilder setReachabilitySeedFromMethodsInGoals(boolean reachabilitySeedFromMethodsInGoals) {
-        this.reachabilitySeedFromMethodsInGoals = reachabilitySeedFromMethodsInGoals;
+    public ProjectConfigurationBuilder setSeedFromMethodsInGoals(boolean seedFromMethodsInGoals) {
+        this.seedFromMethodsInGoals = seedFromMethodsInGoals;
         return this;
     }
 
-    public ProjectConfigurationBuilder setReachabilitySeedFromBranchesInGoals(boolean reachabilitySeedFromBranchesInGoals) {
-        this.reachabilitySeedFromBranchesInGoals = reachabilitySeedFromBranchesInGoals;
+    public ProjectConfigurationBuilder setSeedFromBranchesInGoals(boolean seedFromBranchesInGoals) {
+        this.seedFromBranchesInGoals = seedFromBranchesInGoals;
         return this;
     }
 
-    public ProjectConfigurationBuilder setAlgorithm(String algorithm) {
-        this.algorithm = algorithm;
+    public ProjectConfigurationBuilder setMetaheuristic(String metaheuristic) {
+        this.metaheuristic = metaheuristic;
         return this;
     }
 
-    public ProjectConfigurationBuilder setInitialPopulationGenerationAlgorithm(String initialPopulationGenerationAlgorithm) {
-        this.initialPopulationGenerationAlgorithm = initialPopulationGenerationAlgorithm;
+    public ProjectConfigurationBuilder setInitialPopulationAlgorithm(String initialPopulationAlgorithm) {
+        this.initialPopulationAlgorithm = initialPopulationAlgorithm;
         return this;
     }
 
-    public ProjectConfigurationBuilder setCrossoverAlgorithm(String crossoverAlgorithm) {
-        this.crossoverAlgorithm = crossoverAlgorithm;
+    public ProjectConfigurationBuilder setCrossover(String crossover) {
+        this.crossover = crossover;
         return this;
     }
 
-    public ProjectConfigurationBuilder setReachabilityEntryMethodMutation(boolean reachabilityEntryMethodMutation) {
-        this.reachabilityEntryMethodMutation = reachabilityEntryMethodMutation;
+    public ProjectConfigurationBuilder setEntryMethodMutation(boolean entryMethodMutation) {
+        this.entryMethodMutation = entryMethodMutation;
         return this;
     }
 
@@ -189,20 +168,20 @@ public class ProjectConfigurationBuilder {
         projectConfig.setProjectPath(Validator.validateProjectDir(projectDir));
         projectConfig.setVulnerabilities(Validator.validateVulnerabilitiesFile(vulnerabilitiesFile));
         projectConfig.setChromosomeLength(Validator.validateChromosomeLength(chromosomeLength));
-        projectConfig.setReachabilityBranchAwareness(reachabilityBranchAwareness);
+        projectConfig.setBranchAwareness(branchAwareness);
         projectConfig.setMaxStringLength(Validator.validateMaxStringLength(maxStringLength));
         projectConfig.setProbabilityAddCallsBeforeEntryMethod(Validator.validateProbabilityAddCallsBeforeEntryMethod(probabilityAddCallsBeforeEntryMethod));
         projectConfig.setProbabilityPrimitiveReuse(Validator.validateProbabilityPrimitiveReuse(probabilityPrimitiveReuse));
         projectConfig.setProbabilityPrimitivePool(Validator.validateProbabilityPrimitivePool(probabilityPrimitivePool));
-        projectConfig.setProbabilityObjectReuse(Validator.validateProbabilityPrimitiveObjectReuse(probabilityObjectReuse));
+        projectConfig.setProbabilityObjectReuse(Validator.validateProbabilityObjectReuse(probabilityObjectReuse));
         projectConfig.setProbabilityDynamicPool(Validator.validateProbabilityDynamicPool(probabilityDynamicPool));
         projectConfig.setProbabilityChangeParameter(Validator.validateProbabilityChangeParameter(probabilityChangeParameter));
-        projectConfig.setReachabilitySeedFromMethodsInGoals(reachabilitySeedFromMethodsInGoals);
-        projectConfig.setReachabilitySeedFromBranchesInGoals(reachabilitySeedFromBranchesInGoals);
-        projectConfig.setAlgorithm(Validator.validateAlgorithm(algorithm));
-        projectConfig.setInitialPopulationGenerationAlgorithm(Validator.validateInitialPopulationGenerationAlgorithm(initialPopulationGenerationAlgorithm));
-        projectConfig.setCrossoverAlgorithm(Validator.validateCrossoverAlgorithm(crossoverAlgorithm));
-        projectConfig.setReachabilityEntryMethodMutation(reachabilityEntryMethodMutation);
+        projectConfig.setSeedFromMethodsInGoals(seedFromMethodsInGoals);
+        projectConfig.setSeedFromBranchesInGoals(seedFromBranchesInGoals);
+        projectConfig.setMetaheuristic(Validator.validateMetaheuristic(metaheuristic));
+        projectConfig.setInitialPopulationAlgorithm(Validator.validateInitialPopulationAlgorithm(initialPopulationAlgorithm));
+        projectConfig.setCrossover(Validator.validateCrossover(crossover));
+        projectConfig.setEntryMethodMutation(entryMethodMutation);
         projectConfig.setExceptionPointSampling(exceptionPointSampling);
         projectConfig.setSearchBudget(Validator.validateSearchBudget(searchBudget));
         projectConfig.setPopulationSize(Validator.validatePopulationSize(populationSize));
@@ -295,15 +274,15 @@ public class ProjectConfigurationBuilder {
         }
 
         private static double validateProbabilityPrimitivePool(double probabilityPrimitivePool) {
-            return validateProbability(probabilityPrimitivePool, "The probability of using primitive values from a constant pool built statically");
+            return validateProbability(probabilityPrimitivePool, "The probability of using primitive values from a constant pool carved statically");
         }
 
-        private static double validateProbabilityPrimitiveObjectReuse(double probabilityObjectReuse) {
+        private static double validateProbabilityObjectReuse(double probabilityObjectReuse) {
             return validateProbability(probabilityObjectReuse, "The probability of reusing objects in tests");
         }
 
         private static double validateProbabilityDynamicPool(double probabilityDynamicPool) {
-            return validateProbability(probabilityDynamicPool, "The probability of using primitive values from a constant pool built dynamically");
+            return validateProbability(probabilityDynamicPool, "The probability of using primitive values from a constant pool carved dynamically");
         }
 
         private static double validateProbabilityChangeParameter(double probabilityChangeParameter) {
@@ -320,21 +299,21 @@ public class ProjectConfigurationBuilder {
             return prob;
         }
 
-        private static Properties.Algorithm validateAlgorithm(String algorithm) {
+        private static Properties.Algorithm validateMetaheuristic(String algorithm) {
             if (!EnumUtils.isValidEnum(Properties.Algorithm.class, algorithm)) {
                 throw new IllegalStateException(String.format("%s is not a supported algorithm type.", algorithm));
             }
             return EnumUtils.getEnum(Properties.Algorithm.class, algorithm);
         }
 
-        private static Properties.TestFactory validateInitialPopulationGenerationAlgorithm(String initialPopulationGenerationAlgorithm) {
+        private static Properties.TestFactory validateInitialPopulationAlgorithm(String initialPopulationGenerationAlgorithm) {
             if (!EnumUtils.isValidEnum(Properties.TestFactory.class, initialPopulationGenerationAlgorithm)) {
                 throw new IllegalStateException(String.format("%s is not a supported initial population generation algorithm.", initialPopulationGenerationAlgorithm));
             }
             return EnumUtils.getEnum(Properties.TestFactory.class, initialPopulationGenerationAlgorithm);
         }
 
-        private static Properties.CrossoverFunction validateCrossoverAlgorithm(String crossoverAlgorithm) {
+        private static Properties.CrossoverFunction validateCrossover(String crossoverAlgorithm) {
             if (!EnumUtils.isValidEnum(Properties.CrossoverFunction.class, crossoverAlgorithm)) {
                 throw new IllegalStateException(String.format("%s is not a supported crossover algorithm.", crossoverAlgorithm));
             }

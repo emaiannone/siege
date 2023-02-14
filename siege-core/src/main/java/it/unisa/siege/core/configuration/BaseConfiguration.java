@@ -1,13 +1,16 @@
 package it.unisa.siege.core.configuration;
 
-import org.evosuite.Properties;
+public class BaseConfiguration {
+    private String configurationFile;
+    private String projectDir;
+    private String vulnerabilitiesFile;
 
-import java.nio.file.Path;
-import java.util.List;
+    private String classpathFileName;
+    private String testsDir;
+    private String outDir;
+    private String logDir;
+    private boolean keepEmptyTests;
 
-public class ProjectConfiguration {
-    private Path projectPath;
-    private List<Vulnerability> vulnerabilities;
     private int chromosomeLength;
     private boolean branchAwareness;
     private int maxStringLength;
@@ -19,38 +22,83 @@ public class ProjectConfiguration {
     private double probabilityChangeParameter;
     private boolean seedFromMethodsInGoals;
     private boolean seedFromBranchesInGoals;
-    private Properties.Algorithm metaheuristic;
-    private Properties.TestFactory initialPopulationAlgorithm;
-    private Properties.CrossoverFunction crossover;
+    private String metaheuristic;
+    private String initialPopulationAlgorithm;
+    private String crossover;
     private boolean entryMethodMutation;
     private boolean exceptionPointSampling;
     private int searchBudget;
     private int populationSize;
 
-    ProjectConfiguration() {
+    public String getConfigurationFile() {
+        return configurationFile;
     }
 
-    public Path getProjectPath() {
-        return projectPath;
+    public void setConfigurationFile(String configurationFile) {
+        this.configurationFile = configurationFile;
     }
 
-    void setProjectPath(Path projectPath) {
-        this.projectPath = projectPath;
+    public String getProjectDir() {
+        return projectDir;
     }
 
-    public List<Vulnerability> getVulnerabilities() {
-        return vulnerabilities;
+    public void setProjectDir(String projectDir) {
+        this.projectDir = projectDir;
     }
 
-    void setVulnerabilities(List<Vulnerability> vulnerabilities) {
-        this.vulnerabilities = vulnerabilities;
+    public String getVulnerabilitiesFile() {
+        return vulnerabilitiesFile;
+    }
+
+    public void setVulnerabilitiesFile(String vulnerabilitiesFile) {
+        this.vulnerabilitiesFile = vulnerabilitiesFile;
+    }
+
+    public String getClasspathFileName() {
+        return classpathFileName;
+    }
+
+    public void setClasspathFileName(String classpathFileName) {
+        this.classpathFileName = classpathFileName;
+    }
+
+    public String getTestsDir() {
+        return testsDir;
+    }
+
+    public void setTestsDir(String testsDir) {
+        this.testsDir = testsDir;
+    }
+
+    public String getOutDir() {
+        return outDir;
+    }
+
+    public void setOutDir(String outDir) {
+        this.outDir = outDir;
+    }
+
+    public String getLogDir() {
+        return logDir;
+    }
+
+    public void setLogDir(String logDir) {
+        this.logDir = logDir;
+    }
+
+    public boolean isKeepEmptyTests() {
+        return keepEmptyTests;
+    }
+
+    public void setKeepEmptyTests(boolean keepEmptyTests) {
+        this.keepEmptyTests = keepEmptyTests;
     }
 
     public int getChromosomeLength() {
         return chromosomeLength;
     }
 
-    void setChromosomeLength(int chromosomeLength) {
+    public void setChromosomeLength(int chromosomeLength) {
         this.chromosomeLength = chromosomeLength;
     }
 
@@ -58,7 +106,7 @@ public class ProjectConfiguration {
         return branchAwareness;
     }
 
-    void setBranchAwareness(boolean branchAwareness) {
+    public void setBranchAwareness(boolean branchAwareness) {
         this.branchAwareness = branchAwareness;
     }
 
@@ -66,7 +114,7 @@ public class ProjectConfiguration {
         return maxStringLength;
     }
 
-    void setMaxStringLength(int maxStringLength) {
+    public void setMaxStringLength(int maxStringLength) {
         this.maxStringLength = maxStringLength;
     }
 
@@ -74,7 +122,7 @@ public class ProjectConfiguration {
         return probabilityAddCallsBeforeEntryMethod;
     }
 
-    void setProbabilityAddCallsBeforeEntryMethod(double probabilityAddCallsBeforeEntryMethod) {
+    public void setProbabilityAddCallsBeforeEntryMethod(double probabilityAddCallsBeforeEntryMethod) {
         this.probabilityAddCallsBeforeEntryMethod = probabilityAddCallsBeforeEntryMethod;
     }
 
@@ -82,7 +130,7 @@ public class ProjectConfiguration {
         return probabilityPrimitiveReuse;
     }
 
-    void setProbabilityPrimitiveReuse(double probabilityPrimitiveReuse) {
+    public void setProbabilityPrimitiveReuse(double probabilityPrimitiveReuse) {
         this.probabilityPrimitiveReuse = probabilityPrimitiveReuse;
     }
 
@@ -90,7 +138,7 @@ public class ProjectConfiguration {
         return probabilityPrimitivePool;
     }
 
-    void setProbabilityPrimitivePool(double probabilityPrimitivePool) {
+    public void setProbabilityPrimitivePool(double probabilityPrimitivePool) {
         this.probabilityPrimitivePool = probabilityPrimitivePool;
     }
 
@@ -98,7 +146,7 @@ public class ProjectConfiguration {
         return probabilityObjectReuse;
     }
 
-    void setProbabilityObjectReuse(double probabilityObjectReuse) {
+    public void setProbabilityObjectReuse(double probabilityObjectReuse) {
         this.probabilityObjectReuse = probabilityObjectReuse;
     }
 
@@ -106,7 +154,7 @@ public class ProjectConfiguration {
         return probabilityDynamicPool;
     }
 
-    void setProbabilityDynamicPool(double probabilityDynamicPool) {
+    public void setProbabilityDynamicPool(double probabilityDynamicPool) {
         this.probabilityDynamicPool = probabilityDynamicPool;
     }
 
@@ -114,7 +162,7 @@ public class ProjectConfiguration {
         return probabilityChangeParameter;
     }
 
-    void setProbabilityChangeParameter(double probabilityChangeParameter) {
+    public void setProbabilityChangeParameter(double probabilityChangeParameter) {
         this.probabilityChangeParameter = probabilityChangeParameter;
     }
 
@@ -122,7 +170,7 @@ public class ProjectConfiguration {
         return seedFromMethodsInGoals;
     }
 
-    void setSeedFromMethodsInGoals(boolean seedFromMethodsInGoals) {
+    public void setSeedFromMethodsInGoals(boolean seedFromMethodsInGoals) {
         this.seedFromMethodsInGoals = seedFromMethodsInGoals;
     }
 
@@ -130,42 +178,39 @@ public class ProjectConfiguration {
         return seedFromBranchesInGoals;
     }
 
-    void setSeedFromBranchesInGoals(boolean seedFromBranchesInGoals) {
+    public void setSeedFromBranchesInGoals(boolean seedFromBranchesInGoals) {
         this.seedFromBranchesInGoals = seedFromBranchesInGoals;
     }
 
-    public Properties.Algorithm getMetaheuristic() {
+    public String getMetaheuristic() {
         return metaheuristic;
     }
 
-    public ProjectConfiguration setMetaheuristic(Properties.Algorithm metaheuristic) {
+    public void setMetaheuristic(String metaheuristic) {
         this.metaheuristic = metaheuristic;
-        return this;
     }
 
-    public Properties.TestFactory getInitialPopulationAlgorithm() {
+    public String getInitialPopulationAlgorithm() {
         return initialPopulationAlgorithm;
     }
 
-    public ProjectConfiguration setInitialPopulationAlgorithm(Properties.TestFactory initialPopulationAlgorithm) {
+    public void setInitialPopulationAlgorithm(String initialPopulationAlgorithm) {
         this.initialPopulationAlgorithm = initialPopulationAlgorithm;
-        return this;
     }
 
-    public Properties.CrossoverFunction getCrossover() {
+    public String getCrossover() {
         return crossover;
     }
 
-    public ProjectConfiguration setCrossover(Properties.CrossoverFunction crossover) {
+    public void setCrossover(String crossover) {
         this.crossover = crossover;
-        return this;
     }
 
     public boolean isEntryMethodMutation() {
         return entryMethodMutation;
     }
 
-    void setEntryMethodMutation(boolean entryMethodMutation) {
+    public void setEntryMethodMutation(boolean entryMethodMutation) {
         this.entryMethodMutation = entryMethodMutation;
     }
 
@@ -173,7 +218,7 @@ public class ProjectConfiguration {
         return exceptionPointSampling;
     }
 
-    void setExceptionPointSampling(boolean exceptionPointSampling) {
+    public void setExceptionPointSampling(boolean exceptionPointSampling) {
         this.exceptionPointSampling = exceptionPointSampling;
     }
 
@@ -181,7 +226,7 @@ public class ProjectConfiguration {
         return searchBudget;
     }
 
-    void setSearchBudget(int searchBudget) {
+    public void setSearchBudget(int searchBudget) {
         this.searchBudget = searchBudget;
     }
 
@@ -189,7 +234,7 @@ public class ProjectConfiguration {
         return populationSize;
     }
 
-    void setPopulationSize(int populationSize) {
+    public void setPopulationSize(int populationSize) {
         this.populationSize = populationSize;
     }
 }
