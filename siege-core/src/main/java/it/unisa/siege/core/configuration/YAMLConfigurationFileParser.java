@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import it.unisa.siege.core.BaseConfiguration;
 import it.unisa.siege.core.SiegeIOHelper;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,29 +29,31 @@ public class YAMLConfigurationFileParser {
             List<ProjectConfiguration> projectConfigs = new ArrayList<>();
             YAMLConfiguration yamlConfigs = mapper.readValue(configFile, YAMLConfiguration.class);
             for (YAMLProjectConfiguration yamlProjectConfig : yamlConfigs.projects) {
-                ProjectConfigurationBuilder projectConfigBuilder = new ProjectConfigurationBuilder();
-                String projectDir;
+                // TODO Finalize CLI-defaulting mechanism
                 if (yamlProjectConfig.path == null) {
                     LOGGER.info("An entry has no specific project to analyze. Using default.");
-                    projectDir = baseConfig.getProject();
-                } else {
-                    projectDir = yamlProjectConfig.path;
                 }
-                String vulnerabilitiesFile;
+                String projectDir = yamlProjectConfig.path != null ? yamlProjectConfig.path : baseConfig.getProject();
                 if (yamlProjectConfig.vulnerabilities == null) {
                     LOGGER.info("An entry has no specific vulnerabilities to analyze. Using default from CLI.");
-                    vulnerabilitiesFile = baseConfig.getVulnerabilitiesFileName();
-                } else {
-                    vulnerabilitiesFile = yamlProjectConfig.vulnerabilities;
                 }
-                // TODO Supply all the other YAML data here
-                ProjectConfiguration projectConfig = projectConfigBuilder
-                        .setProjectDir(projectDir)
-                        .setVulnerabilitiesFile(vulnerabilitiesFile)
-                        .setSearchBudget(yamlProjectConfig.searchBudget)
-                        .setPopulationSize(yamlProjectConfig.populationSize)
-                        .build();
-                projectConfigs.add(projectConfig);
+                String vulnerabilitiesFile = yamlProjectConfig.vulnerabilities != null ? yamlProjectConfig.vulnerabilities : baseConfig.getVulnerabilitiesFileName();
+
+                try {
+                    // TODO Supply all the other YAML data here.
+                    ProjectConfiguration projectConfig = new ProjectConfigurationBuilder()
+                            .setProjectDir(projectDir)
+                            .setVulnerabilitiesFile(vulnerabilitiesFile)
+                            .setSearchBudget(yamlProjectConfig.searchBudget)
+                            .setPopulationSize(yamlProjectConfig.populationSize)
+                            .build();
+                    projectConfigs.add(projectConfig);
+                } catch (IllegalStateException e) {
+                    // If we supply an invalid value, we log and skip the project
+                    LOGGER.info("Project {} has an invalid parameter in the configuration file. Skipping this project.", projectDir);
+                    LOGGER.warn("Details: {}", e.getMessage());
+                    LOGGER.error("{}", ExceptionUtils.getStackTrace(e));
+                }
             }
             return projectConfigs;
         } catch (IOException e) {
@@ -79,7 +82,7 @@ public class YAMLConfigurationFileParser {
         public Double probabilityChangeParameter;
         public Boolean reachabilitySeedFromMethodsInGoals;
         public Boolean reachabilitySeedFromBranchesInGoals;
-        public String gaType;
+        public String algorithm;
         public String initialPopulationGenerationAlgorithm;
         public String crossoverAlgorithm;
         public Boolean reachabilityEntryMethodMutation;

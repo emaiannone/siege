@@ -42,7 +42,6 @@ public class SiegeLauncher {
     private final Path baseOutDirPath;
     private final Path baseLogDirPath;
 
-
     public SiegeLauncher(BaseConfiguration baseConfig) throws Exception {
         this.baseConfig = baseConfig;
         String siegeStartTime = new SimpleDateFormat(DATE_FORMAT).format(new Date());
@@ -56,9 +55,8 @@ public class SiegeLauncher {
         } else {
             LOGGER.info("Running Siege with command-line options.");
             LOGGER.info("Unspecified options will be given default values.");
-            ProjectConfigurationBuilder projectConfigBuilder = new ProjectConfigurationBuilder();
-            // TODO Supply all the other CLI options here, when they will be supported
-            ProjectConfiguration projectConfig = projectConfigBuilder
+            // TODO Add new CLI options (according to the content of ProjectConfiguration) and send it there
+            ProjectConfiguration projectConfig = new ProjectConfigurationBuilder()
                     .setProjectDir(baseConfig.getProject())
                     .setVulnerabilitiesFile(baseConfig.getVulnerabilitiesFileName())
                     .setSearchBudget(baseConfig.getBudget())
@@ -99,7 +97,7 @@ public class SiegeLauncher {
         }
     }
 
-    private ProjectResult analyzeProject(ProjectConfiguration projectConfig) throws Exception {
+    private void analyzeProject(ProjectConfiguration projectConfig) throws Exception {
         ProjectResult projectResult = new ProjectResult(projectConfig);
         String runStartTime = new SimpleDateFormat(DATE_FORMAT).format(new Date());
         projectResult.setStartTime(runStartTime);
@@ -110,7 +108,7 @@ public class SiegeLauncher {
             String endTime = new SimpleDateFormat(DATE_FORMAT).format(new Date());
             LOGGER.info("Terminating Siege run at: {}", endTime);
             projectResult.setEndTime(endTime);
-            return projectResult;
+            return;
         }
 
         // Instantiate EvoSuite now just to update the logging context
@@ -171,13 +169,13 @@ public class SiegeLauncher {
                 "-Dmax_string=" + projectConfig.getMaxStringLength(),
                 // High probability of sampling primitives from a constant pool
                 "-Dprimitive_pool=" + projectConfig.getProbabilityPrimitivePool(),
-                // Use only the static pool, i.e., the pool of constants carved statically
+                // The probability of using constants carved during test execution (i.e., not those carved statically)
                 "-Ddynamic_pool=" + projectConfig.getProbabilityDynamicPool(),
                 // Seed constants from methods or branches from coverage goals of REACHABILITY criterion. If "methods" is active, it has the precedence over "branches". Set both as false to use the ordinary EvoSuite pool
                 "-Dreachability_seed_from_methods_in_goals=" + projectConfig.isReachabilitySeedFromMethodsInGoals(),
                 "-Dreachability_seed_from_branches_in_goals=" + projectConfig.isReachabilitySeedFromBranchesInGoals(),
                 // We use the Steady State GA as runner
-                "-Dalgorithm=" + projectConfig.getGaType(),
+                "-Dalgorithm=" + projectConfig.getAlgorithm(),
                 // This custom crossover function crosses tests using the points where the tests crashed. For tests not crashing, it behaves like an ordinary single point crossover
                 "-Dcrossover_function=" + projectConfig.getCrossoverAlgorithm(),
                 // We ask to use exception points to sample which statements to give priority for crossover or mutation
@@ -251,8 +249,6 @@ public class SiegeLauncher {
         // TODO Export to JSON file into projectOutDirPath. For now, we print for debugging purposes
         System.out.printf("DEBUG: Export to %s%n", projectOutDirPath);
         System.out.println(projectResult);
-
-        return projectResult;
     }
 
     private GenerationResult generateFromClass(String entryClass, String cve, Path baseLogDirPath, List<String> baseCommands) throws IOException {

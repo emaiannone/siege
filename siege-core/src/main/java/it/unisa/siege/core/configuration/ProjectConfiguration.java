@@ -1,5 +1,7 @@
 package it.unisa.siege.core.configuration;
 
+import org.evosuite.Properties;
+
 import java.nio.file.Path;
 import java.util.List;
 
@@ -17,9 +19,9 @@ public class ProjectConfiguration {
     private double probabilityChangeParameter;
     private boolean reachabilitySeedFromMethodsInGoals;
     private boolean reachabilitySeedFromBranchesInGoals;
-    private String gaType;
-    private String initialPopulationGenerationAlgorithm;
-    private String crossoverAlgorithm;
+    private Properties.Algorithm algorithm;
+    private Properties.TestFactory initialPopulationGenerationAlgorithm;
+    private Properties.CrossoverFunction crossoverAlgorithm;
     private boolean reachabilityEntryMethodMutation;
     private boolean exceptionPointSampling;
     private int searchBudget;
@@ -132,28 +134,31 @@ public class ProjectConfiguration {
         this.reachabilitySeedFromBranchesInGoals = reachabilitySeedFromBranchesInGoals;
     }
 
-    public String getGaType() {
-        return gaType;
+    public Properties.Algorithm getAlgorithm() {
+        return algorithm;
     }
 
-    void setGaType(String gaType) {
-        this.gaType = gaType;
+    public ProjectConfiguration setAlgorithm(Properties.Algorithm algorithm) {
+        this.algorithm = algorithm;
+        return this;
     }
 
-    public String getInitialPopulationGenerationAlgorithm() {
+    public Properties.TestFactory getInitialPopulationGenerationAlgorithm() {
         return initialPopulationGenerationAlgorithm;
     }
 
-    void setInitialPopulationGenerationAlgorithm(String initialPopulationGenerationAlgorithm) {
+    public ProjectConfiguration setInitialPopulationGenerationAlgorithm(Properties.TestFactory initialPopulationGenerationAlgorithm) {
         this.initialPopulationGenerationAlgorithm = initialPopulationGenerationAlgorithm;
+        return this;
     }
 
-    public String getCrossoverAlgorithm() {
+    public Properties.CrossoverFunction getCrossoverAlgorithm() {
         return crossoverAlgorithm;
     }
 
-    void setCrossoverAlgorithm(String crossoverAlgorithm) {
+    public ProjectConfiguration setCrossoverAlgorithm(Properties.CrossoverFunction crossoverAlgorithm) {
         this.crossoverAlgorithm = crossoverAlgorithm;
+        return this;
     }
 
     public boolean isReachabilityEntryMethodMutation() {
