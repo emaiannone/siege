@@ -1,5 +1,6 @@
 package it.unisa.siege.core.results;
 
+import it.unisa.siege.core.common.Exportable;
 import org.evosuite.ga.FitnessFunction;
 import org.evosuite.ga.metaheuristics.GeneticAlgorithm;
 import org.evosuite.ga.stoppingconditions.MaxTimeStoppingCondition;
@@ -7,12 +8,10 @@ import org.evosuite.ga.stoppingconditions.StoppingCondition;
 import org.evosuite.result.TestGenerationResult;
 import org.evosuite.testcase.TestChromosome;
 
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
-public class GenerationResult {
+public class GenerationResult implements Exportable<Map<String, Object>> {
     private final String entryClass;
     private final int entryPaths;
     private final int spentBudget;
@@ -35,15 +34,15 @@ public class GenerationResult {
     }
 
     @Override
-    public String toString() {
-        return "GenerationResult{" +
-                "entryClass='" + entryClass + '\'' +
-                ", entryPaths=" + entryPaths +
-                ", spentBudget=" + spentBudget +
-                ", bestFitness=" + bestFitness +
-                ", iterations=" + iterations +
-                ", succeeded=" + succeeded +
-                '}';
+    public Map<String, Object> export() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("entryClass", entryClass);
+        map.put("entryPaths", entryPaths);
+        map.put("spentBudget", spentBudget);
+        map.put("bestFitness", bestFitness);
+        map.put("iterations", iterations);
+        map.put("succeeded", succeeded);
+        return map;
     }
 
     private int calculateSpentBudget(GeneticAlgorithm<TestChromosome> algorithm) {

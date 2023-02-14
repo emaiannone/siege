@@ -1,12 +1,12 @@
 package it.unisa.siege.core.results;
 
+import it.unisa.siege.core.common.Exportable;
 import it.unisa.siege.core.configuration.ProjectConfiguration;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
-public class ProjectResult {
+public class ProjectResult implements Exportable<Map<String, Object>> {
     private final ProjectConfiguration projectConfig;
     private final List<VulnerabilityResult> vulnerabilityResults;
     private Date startTime;
@@ -18,21 +18,37 @@ public class ProjectResult {
     }
 
     @Override
-    public String toString() {
-        return "ProjectResult{" +
-                "projectConfig=" + projectConfig +
-                ", vulnerabilityResults=" + vulnerabilityResults +
-                ", startTime='" + startTime + '\'' +
-                ", endTime='" + endTime + '\'' +
-                '}';
+    public Map<String, Object> export() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("start", startTime);
+        map.put("end", endTime);
+        map.put("configuration", projectConfig.export());
+        map.put("vulnerabilityResults", vulnerabilityResults.stream().map(VulnerabilityResult::export).collect(Collectors.toList()));
+        return map;
     }
 
     public void addVulnerabilityResult(VulnerabilityResult vulnerabilityResult) {
         vulnerabilityResults.add(vulnerabilityResult);
     }
 
+    public ProjectConfiguration getProjectConfig() {
+        return projectConfig;
+    }
+
+    public List<VulnerabilityResult> getVulnerabilityResults() {
+        return Collections.unmodifiableList(vulnerabilityResults);
+    }
+
+    public Date getStartTime() {
+        return startTime;
+    }
+
     public void setStartTime(Date startTime) {
         this.startTime = startTime;
+    }
+
+    public Date getEndTime() {
+        return endTime;
     }
 
     public void setEndTime(Date endTime) {

@@ -1,11 +1,14 @@
 package it.unisa.siege.core.configuration;
 
+import it.unisa.siege.core.common.Exportable;
 import org.evosuite.Properties;
 
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
-public class ProjectConfiguration {
+public class ProjectConfiguration implements Exportable<Map<String, Object>> {
     private Path projectPath;
     private List<Vulnerability> vulnerabilities;
     private int chromosomeLength;
@@ -191,5 +194,31 @@ public class ProjectConfiguration {
 
     void setPopulationSize(int populationSize) {
         this.populationSize = populationSize;
+    }
+
+    @Override
+    public Map<String, Object> export() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("projectPath", projectPath.toString());
+        map.put("vulnerabilities", vulnerabilities.size());
+        map.put("chromosomeLength", chromosomeLength);
+        map.put("branchAwareness", branchAwareness);
+        map.put("maxStringLength", maxStringLength);
+        map.put("probabilityAddCallsBeforeEntryMethod", probabilityAddCallsBeforeEntryMethod);
+        map.put("probabilityPrimitiveReuse", probabilityPrimitiveReuse);
+        map.put("probabilityPrimitivePool", probabilityPrimitivePool);
+        map.put("probabilityObjectReuse", probabilityObjectReuse);
+        map.put("probabilityDynamicPool", probabilityDynamicPool);
+        map.put("probabilityChangeParameter", probabilityChangeParameter);
+        map.put("seedFromMethodsInGoals", seedFromMethodsInGoals);
+        map.put("seedFromBranchesInGoals", seedFromBranchesInGoals);
+        map.put("metaheuristic", metaheuristic.name());
+        map.put("initialPopulationAlgorithm", initialPopulationAlgorithm.name());
+        map.put("crossover", crossover.name());
+        map.put("entryMethodMutation", entryMethodMutation);
+        map.put("exceptionPointSampling", exceptionPointSampling);
+        map.put("searchBudget", searchBudget);
+        map.put("populationSize", populationSize);
+        return map;
     }
 }

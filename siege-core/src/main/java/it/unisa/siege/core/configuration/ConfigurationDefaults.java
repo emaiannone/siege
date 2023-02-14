@@ -2,6 +2,9 @@ package it.unisa.siege.core.configuration;
 
 import org.evosuite.Properties;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 public class ConfigurationDefaults {
     public static final String PROJECT_DIR_DEFAULT = null;
     public static final String VULNERABILITIES_FILE_DEFAULT = null;
@@ -23,4 +26,8 @@ public class ConfigurationDefaults {
     public static final boolean EXCEPTION_POINT_SAMPLING_DEFAULT = true;
     public static final int SEARCH_BUDGET_DEFAULT = 60;
     public static final int POPULATION_SIZE_DEFAULT = 100;
+
+    public static final Path TESTS_DIR_PATH_DEFAULT = Paths.get("./siege_tests");
+    public static final Path OUT_DIR_PATH_DEFAULT = Paths.get("./siege_results");
+    public static final Path LOG_DIR_PATH_DEFAULT = Paths.get("./siege_logs");
 }
