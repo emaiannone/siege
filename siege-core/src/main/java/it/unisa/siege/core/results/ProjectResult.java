@@ -22,7 +22,10 @@ public class ProjectResult implements Exportable<Map<String, Object>> {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("start", startTime);
         map.put("end", endTime);
-        map.put("configuration", projectConfig.export());
+        Map<String, Object> projectConfigExport = projectConfig.export();
+        map.put("projectPath", projectConfigExport.remove("projectPath"));
+        map.put("vulnerabilities", projectConfigExport.remove("vulnerabilities"));
+        map.put("configuration", projectConfigExport);
         map.put("vulnerabilityResults", vulnerabilityResults.stream().map(VulnerabilityResult::export).collect(Collectors.toList()));
         return map;
     }

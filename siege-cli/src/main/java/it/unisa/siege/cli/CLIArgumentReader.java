@@ -30,6 +30,7 @@ public class CLIArgumentReader {
         baseConfig.setTestsDir(commandLine.getOptionValue(CLIOptions.TESTS_DIR_OPT));
         baseConfig.setOutDir(commandLine.getOptionValue(CLIOptions.OUT_DIR_OPT));
         baseConfig.setLogDir(commandLine.getOptionValue(CLIOptions.LOG_DIR_OPT));
+        baseConfig.setVerboseLog(commandLine.hasOption(CLIOptions.VERBOSE_LOG));
         baseConfig.setKeepEmptyTests(commandLine.hasOption(CLIOptions.KEEP_EMPTY_TESTS_OPT));
 
         baseConfig.setChromosomeLength(commandLine.hasOption(CLIOptions.CHROMOSOME_LENGTH_OPT) ?

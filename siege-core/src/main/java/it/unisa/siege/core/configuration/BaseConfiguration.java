@@ -9,6 +9,7 @@ public class BaseConfiguration {
     private String testsDir;
     private String outDir;
     private String logDir;
+    private boolean verboseLog;
     private boolean keepEmptyTests;
 
     private int chromosomeLength;
@@ -84,6 +85,14 @@ public class BaseConfiguration {
 
     public void setLogDir(String logDir) {
         this.logDir = logDir;
+    }
+
+    public boolean isVerboseLog() {
+        return verboseLog;
+    }
+
+    public void setVerboseLog(boolean verboseLog) {
+        this.verboseLog = verboseLog;
     }
 
     public boolean isKeepEmptyTests() {

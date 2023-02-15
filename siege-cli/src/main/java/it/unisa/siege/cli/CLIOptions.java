@@ -16,6 +16,7 @@ public class CLIOptions extends Options {
     public static final String TESTS_DIR_OPT = "testsDir";
     public static final String OUT_DIR_OPT = "outDir";
     public static final String LOG_DIR_OPT = "logDir";
+    public static final String VERBOSE_LOG = "verboseLog";
     public static final String KEEP_EMPTY_TESTS_OPT = "keepEmptyTests";
 
     // Configuration part
@@ -81,6 +82,12 @@ public class CLIOptions extends Options {
         addOption(Option.builder(LOG_DIR_OPT)
                 .hasArg(true)
                 .desc("Path to a directory where Siege will store the detail of the generations. Inside this directory, one subdirectory per run and per project will be created. If not supplied, a Siege-specific directory in the current working directory will be used.")
+                .build()
+        );
+
+        addOption(Option.builder(VERBOSE_LOG)
+                .hasArg(false)
+                .desc("Flag that indicates whether to print extra information in generation logs, e.g., test codes, specific scores for the fitness score. Useful for debugging.")
                 .build()
         );
 

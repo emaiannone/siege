@@ -3,7 +3,7 @@
     <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.err</target>
         <encoder>
-            <pattern>%-5p| [SIEGE] %m \(%c.java:%L\)%n</pattern>
+            <pattern>%-5p| [Siege] %m \(%c.java:%L\)%n</pattern>
         </encoder>
         <filter class="ch.qos.logback.classic.filter.LevelFilter">
             <level>ERROR</level>
@@ -15,7 +15,7 @@
     <appender name="STDOUT_SHORT" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
         <encoder>
-            <pattern>%-5p| %green([SIEGE]) %m%n</pattern>
+            <pattern>%-5p| %green([Siege]) %m%n</pattern>
         </encoder>
         <filter class="ch.qos.logback.classic.filter.LevelFilter">
             <level>INFO</level>
@@ -27,7 +27,7 @@
     <appender name="STDOUT_LONG" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
         <encoder>
-            <pattern>%blue(%-5p| %green([SIEGE]) %m \(%c.java:%L\)%n)</pattern>
+            <pattern>%blue(%-5p| %green([Siege]) %m \(%c.java:%L\)%n)</pattern>
         </encoder>
         <filter class="ch.qos.logback.classic.filter.LevelFilter">
             <level>INFO</level>

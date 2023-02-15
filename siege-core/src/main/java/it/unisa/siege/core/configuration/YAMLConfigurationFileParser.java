@@ -18,7 +18,7 @@ public class YAMLConfigurationFileParser {
 
     public static List<ProjectConfiguration> parseConfigFile(BaseConfiguration baseConfig) {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
         File configFile = Paths.get(baseConfig.getConfigurationFile()).toFile();
         try {
             List<ProjectConfiguration> projectConfigs = new ArrayList<>();
@@ -27,7 +27,7 @@ public class YAMLConfigurationFileParser {
             for (YAMLProjectConfiguration yamlProjectConfig : projects) {
                 // If values are not found in the YAML file, they are defaulted from BaseConfiguration
                 // TODO Should log something when values are not in YAML file, but not too verbose
-                String projectDir = yamlProjectConfig.path != null ? yamlProjectConfig.path : baseConfig.getProjectDir();
+                String projectDir = yamlProjectConfig.projectDir != null ? yamlProjectConfig.projectDir : baseConfig.getProjectDir();
                 String vulnerabilitiesFile = yamlProjectConfig.vulnerabilities != null ? yamlProjectConfig.vulnerabilities : baseConfig.getVulnerabilitiesFile();
                 int chromosomeLength = yamlProjectConfig.chromosomeLength != null ? yamlProjectConfig.chromosomeLength : baseConfig.getChromosomeLength();
                 boolean branchAwareness = yamlProjectConfig.branchAwareness != null ? yamlProjectConfig.branchAwareness : baseConfig.isBranchAwareness();
@@ -45,7 +45,7 @@ public class YAMLConfigurationFileParser {
                 String crossover = yamlProjectConfig.crossover != null ? yamlProjectConfig.crossover : baseConfig.getCrossover();
                 boolean entryMethodMutation = yamlProjectConfig.entryMethodMutation != null ? yamlProjectConfig.entryMethodMutation : baseConfig.isEntryMethodMutation();
                 boolean exceptionPointSampling = yamlProjectConfig.exceptionPointSampling != null ? yamlProjectConfig.exceptionPointSampling : baseConfig.isExceptionPointSampling();
-                int searchBudget = yamlProjectConfig.searchBudget != null ? yamlProjectConfig.searchBudget : baseConfig.getSearchBudget();
+                int searchBudget = yamlProjectConfig.budget != null ? yamlProjectConfig.budget : baseConfig.getSearchBudget();
                 int populationSize = yamlProjectConfig.populationSize != null ? yamlProjectConfig.populationSize : baseConfig.getPopulationSize();
                 try {
                     ProjectConfiguration projectConfig = new ProjectConfigurationBuilder()
@@ -92,7 +92,7 @@ public class YAMLConfigurationFileParser {
     }
 
     private static class YAMLProjectConfiguration {
-        public String path;
+        public String projectDir;
         public String vulnerabilities;
         public Integer chromosomeLength;
         public Boolean branchAwareness;
@@ -110,7 +110,7 @@ public class YAMLConfigurationFileParser {
         public String crossover;
         public Boolean entryMethodMutation;
         public Boolean exceptionPointSampling;
-        public Integer searchBudget;
+        public Integer budget;
         public Integer populationSize;
 
         public YAMLProjectConfiguration() {

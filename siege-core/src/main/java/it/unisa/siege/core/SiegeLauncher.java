@@ -48,8 +48,10 @@ public class SiegeLauncher {
             if (!SiegeIOHelper.isYamlFile(configFilePath.toFile())) {
                 throw new IOException("The configuration file is not a YAML file.");
             }
-            LOGGER.info("({}) Running Siege with configuration file: {}.", new SimpleDateFormat(DATE_FORMAT_STDOUT).format(siegeStartTime), configFilePath);
+            LOGGER.info("Running Siege with configuration file: {}", configFilePath);
             projectConfigs.addAll(YAMLConfigurationFileParser.parseConfigFile(baseConfig));
+            LOGGER.info("Found {} projects to analyze", projectConfigs.size());
+            LOGGER.debug("Projects ({}): {}", projectConfigs.size(), projectConfigs.stream().map(ProjectConfiguration::getProjectPath).collect(Collectors.toList()));
         } else {
             LOGGER.info("Running Siege with command-line options.");
             ProjectConfiguration projectConfig = new ProjectConfigurationBuilder()
@@ -115,7 +117,7 @@ public class SiegeLauncher {
         projectResult.setStartTime(projectAnalysisStartTime);
         Path projectPath = projectConfig.getProjectPath();
         String projectName = projectPath.getFileName().toString();
-        LOGGER.info("({}) Analyzing project: {}", new SimpleDateFormat(DATE_FORMAT_STDOUT).format(projectAnalysisStartTime), projectName);
+        LOGGER.info("({}) Starting analysis for project: {}", new SimpleDateFormat(DATE_FORMAT_STDOUT).format(projectAnalysisStartTime), projectName);
         List<Vulnerability> vulnerabilities = projectConfig.getVulnerabilities();
         if (vulnerabilities.isEmpty()) {
             LOGGER.info("No vulnerabilities to reach. No generation can be done.");
@@ -187,7 +189,8 @@ public class SiegeLauncher {
                 "-Dexception_point_sampling=" + projectConfig.isExceptionPointSampling(),
                 "-Dp_change_parameter=" + projectConfig.getProbabilityChangeParameter(),
                 "-Dsearch_budget=" + projectConfig.getSearchBudget(),
-                "-Dpopulation=" + projectConfig.getPopulationSize()
+                "-Dpopulation=" + projectConfig.getPopulationSize(),
+                "-Dgeneration_log_verbose=" + baseConfig.isVerboseLog()
         ));
 
         LOGGER.info("Generating tests targeting {} vulnerabilities from a pool of {} client classes.", vulnerabilities.size(), clientClasses.size());
