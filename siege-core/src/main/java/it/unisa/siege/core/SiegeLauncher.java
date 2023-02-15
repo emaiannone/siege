@@ -3,7 +3,7 @@ package it.unisa.siege.core;
 import it.unisa.siege.core.common.SiegeIOHelper;
 import it.unisa.siege.core.configuration.*;
 import it.unisa.siege.core.preprocessing.ProjectBuilder;
-import it.unisa.siege.core.preprocessing.RootProximityEntryPointFinder;
+import it.unisa.siege.core.preprocessing.TargetDistanceEntryPointFinder;
 import it.unisa.siege.core.results.GenerationResult;
 import it.unisa.siege.core.results.ProjectResult;
 import it.unisa.siege.core.results.VulnerabilityResult;
@@ -220,8 +220,8 @@ public class SiegeLauncher {
                 continue;
             }
 
-            // This method sorts the client classes based on how they appear in the static paths.
-            List<String> entryClasses = new RootProximityEntryPointFinder().findEntryPoints(clientClasses, staticPaths);
+            List<String> entryClasses = new TargetDistanceEntryPointFinder().findEntryPoints(clientClasses, staticPaths);
+            //List<String> entryClasses = new RootProximityEntryPointFinder().findEntryPoints(clientClasses, staticPaths);
             if (entryClasses.isEmpty()) {
                 LOGGER.warn("No client classes seems to reach vulnerability {}. Generation will not start.", vulnerability.getCve());
                 continue;
